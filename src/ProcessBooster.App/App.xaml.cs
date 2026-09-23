@@ -67,10 +67,17 @@ public partial class App : Application
         vm.Start();
     }
 
+    private bool _errorShown;
+
     private void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        MessageBox.Show(e.Exception.Message, "Process Booster — unexpected error",
-            MessageBoxButton.OK, MessageBoxImage.Error);
-        e.Handled = true;
+        LogStartup("Dispatcher: " + e.Exception);
+        if (!_errorShown)
+        {
+            _errorShown = true;
+            MessageBox.Show(e.Exception.Message, "Process Booster — unexpected error",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        e.Handled = true; // keep the app alive; subsequent errors are logged, not popped
     }
 }
