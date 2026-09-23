@@ -265,7 +265,7 @@
             <TabItem Content="{Binding MemoryTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Ram24" Margin="0,0,8,0" />
+                        <ui:SymbolIcon Symbol="Memory16" Margin="0,0,8,0" />
                         <TextBlock Text="Memory" VerticalAlignment="Center" />
                     </StackPanel>
                 </TabItem.Header>
