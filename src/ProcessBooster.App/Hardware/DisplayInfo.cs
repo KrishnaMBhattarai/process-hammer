@@ -1,68 +1,220 @@
 using System.Management;
+using System.Runtime.InteropServices;
 
 namespace ProcessBooster.App.Hardware;
 
 /// <summary>
-/// Collects per-monitor display detail via WMI. Physical monitor identity/size lives in the
-/// <c>root\wmi</c> namespace (WmiMonitorID / WmiMonitorBasicDisplayParams), which can be
-/// inaccessible on some systems; the current desktop mode comes from Win32_VideoController in the
-/// default namespace. Every query is defensive: a missing class/property yields "—" and Collect()
-/// never throws, so whatever data is available still renders.
+/// Collects per-monitor display detail. The physical <b>connection type</b> (HDMI / DisplayPort /
+/// DVI / VGA / internal) can only be read reliably from the Windows DisplayConfig API
+/// (user32.dll), which is the primary source here: it enumerates the active display paths and
+/// yields each target's friendly name, connector technology, and active resolution @ refresh.
+/// WMI (<c>root\wmi</c> WmiMonitorID / WmiMonitorBasicDisplayParams) supplements this with the
+/// manufacturer, physical diagonal, and year of manufacture, best-effort matched by friendly name.
+/// Every call is defensive: any failure degrades to "—" and <see cref="Collect"/> never throws.
 /// </summary>
 public static class DisplayInfoService
 {
     public static List<InfoSection> Collect()
     {
+        var monitors = QueryDisplayConfigMonitors();      // primary: connector type + resolution
+        var wmi = QueryWmiMonitors();                     // supplement: mfr / size / year
+
         var sections = new List<InfoSection>();
+
+        if (monitors.Count > 0)
+        {
+            var multi = monitors.Count > 1;
+            for (var i = 0; i < monitors.Count; i++)
+            {
+                var m = monitors[i];
+                var title = m.FriendlyName is not "—" ? m.FriendlyName : $"Monitor {i + 1}";
+                var s = new InfoSection { Title = multi ? $"{title}  ·  Monitor {i + 1}" : title };
+
+                // Best-effort correlate a WMI record by friendly name; else fall back positionally.
+                var match = MatchWmi(wmi, m.FriendlyName, i);
+
+                s.Items.Add(new("Name", m.FriendlyName));
+                s.Items.Add(new("Connection", m.Connection));
+                s.Items.Add(new("Resolution", m.Resolution));
+                s.Items.Add(new("Physical size", match?.Size ?? "—"));
+                s.Items.Add(new("Manufacturer", match?.Manufacturer ?? "—"));
+                s.Items.Add(new("Year", match?.Year ?? "—"));
+                sections.Add(s);
+            }
+            return sections;
+        }
+
+        // DisplayConfig unavailable — degrade to a WMI-only section per monitor.
+        if (wmi.Count > 0)
+        {
+            var multi = wmi.Count > 1;
+            for (var i = 0; i < wmi.Count; i++)
+            {
+                var w = wmi[i];
+                var title = w.FriendlyName is not "—" ? w.FriendlyName : $"Monitor {i + 1}";
+                var s = new InfoSection { Title = multi ? $"{title}  ·  Monitor {i + 1}" : title };
+                s.Items.Add(new("Name", w.FriendlyName));
+                s.Items.Add(new("Connection", "—"));
+                s.Items.Add(new("Resolution", "—"));
+                s.Items.Add(new("Physical size", w.Size));
+                s.Items.Add(new("Manufacturer", w.Manufacturer));
+                s.Items.Add(new("Year", w.Year));
+                sections.Add(s);
+            }
+        }
+
+        return sections;
+    }
+
+    // =====================================================================================
+    //  DisplayConfig (user32.dll) — primary source for connector type + active mode.
+    // =====================================================================================
+
+    private sealed record DisplayMonitor(string FriendlyName, string Connection, string Resolution);
+
+    private static List<DisplayMonitor> QueryDisplayConfigMonitors()
+    {
+        var result = new List<DisplayMonitor>();
+        try
+        {
+            if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, out var numPaths, out var numModes) != ERROR_SUCCESS)
+                return result;
+            if (numPaths == 0)
+                return result;
+
+            var paths = new DISPLAYCONFIG_PATH_INFO[numPaths];
+            var modes = new DISPLAYCONFIG_MODE_INFO[numModes];
+
+            if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, ref numPaths, paths, ref numModes, modes, IntPtr.Zero) != ERROR_SUCCESS)
+                return result;
+
+            for (var p = 0; p < numPaths; p++)
+            {
+                var path = paths[p];
+
+                // Friendly name + connector technology for this target.
+                var name = new DISPLAYCONFIG_TARGET_DEVICE_NAME
+                {
+                    header = new DISPLAYCONFIG_DEVICE_INFO_HEADER
+                    {
+                        type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME,
+                        size = (uint)Marshal.SizeOf<DISPLAYCONFIG_TARGET_DEVICE_NAME>(),
+                        adapterId = path.targetInfo.adapterId,
+                        id = path.targetInfo.id,
+                    },
+                };
+
+                var friendly = "—";
+                var connection = "—";
+                if (DisplayConfigGetDeviceInfo(ref name) == ERROR_SUCCESS)
+                {
+                    friendly = Clean(name.monitorFriendlyDeviceName);
+                    connection = OutputTechnology(name.outputTechnology);
+                }
+                else
+                {
+                    // Fall back to the connector info carried on the path itself.
+                    connection = OutputTechnology(path.targetInfo.outputTechnology);
+                }
+
+                var resolution = ResolutionFor(path, modes);
+                result.Add(new DisplayMonitor(friendly, connection, resolution));
+            }
+        }
+        catch { /* DisplayConfig unavailable — caller degrades to WMI-only. */ }
+
+        return result;
+    }
+
+    private static string ResolutionFor(DISPLAYCONFIG_PATH_INFO path, DISPLAYCONFIG_MODE_INFO[] modes)
+    {
+        try
+        {
+            var idx = path.targetInfo.modeInfoIdx;
+            if (idx < modes.Length && modes[idx].infoType == DISPLAYCONFIG_MODE_INFO_TYPE_TARGET)
+            {
+                var sig = modes[idx].targetMode.targetVideoSignalInfo;
+                var w = sig.activeSize.cx;
+                var h = sig.activeSize.cy;
+                if (w > 0 && h > 0)
+                {
+                    var hz = RefreshHz(sig.vSyncFreq);
+                    return hz > 0 ? $"{w} x {h} @ {hz} Hz" : $"{w} x {h}";
+                }
+            }
+            return "—";
+        }
+        catch { return "—"; }
+    }
+
+    private static int RefreshHz(DISPLAYCONFIG_RATIONAL r)
+    {
+        if (r.Denominator == 0) return 0;
+        return (int)Math.Round((double)r.Numerator / r.Denominator);
+    }
+
+    private static string OutputTechnology(uint tech) => unchecked((int)tech) switch
+    {
+        unchecked((int)0xFFFFFFFF) => "Other",
+        0 => "VGA",
+        1 => "S-Video",
+        2 => "Composite",
+        3 => "Component",
+        4 => "DVI",
+        5 => "HDMI",
+        6 => "LVDS (internal)",
+        8 => "D-Jpn",
+        9 => "SDI",
+        10 => "DisplayPort (external)",
+        11 => "DisplayPort (embedded)",
+        12 => "UDI (external)",
+        13 => "UDI (embedded)",
+        15 => "Internal",
+        unchecked((int)0x80000000) => "Internal",
+        _ => "—",
+    };
+
+    // =====================================================================================
+    //  WMI (root\wmi) — supplement: manufacturer, physical size, year of manufacture.
+    // =====================================================================================
+
+    private sealed record WmiMonitor(string FriendlyName, string Manufacturer, string Size, string Year);
+
+    private static List<WmiMonitor> QueryWmiMonitors()
+    {
+        var list = new List<WmiMonitor>();
         try
         {
             var ids = Wmi(@"root\wmi", "WmiMonitorID");
             var pars = Wmi(@"root\wmi", "WmiMonitorBasicDisplayParams");
 
-            // Enumerate physical monitors; join on InstanceName which is shared across both classes.
-            var count = ids.Count;
-            for (var i = 0; i < count; i++)
+            for (var i = 0; i < ids.Count; i++)
             {
                 var id = ids[i];
                 var instance = Str(id, "InstanceName");
                 var par = pars.FirstOrDefault(p => Str(p, "InstanceName") == instance) ?? pars.ElementAtOrDefault(i);
 
-                var friendly = Decode(id, "UserFriendlyName");
-                var title = friendly is not "—" ? friendly : $"Monitor {i + 1}";
-                var s = new InfoSection { Title = count > 1 ? $"{title}  ·  Monitor {i + 1}" : title };
-
-                s.Items.Add(new("Name", friendly));
-                s.Items.Add(new("Manufacturer", Decode(id, "ManufacturerName")));
-                s.Items.Add(new("Product code", Decode(id, "ProductCodeID")));
-                s.Items.Add(new("Serial number", Decode(id, "SerialNumberID")));
-                s.Items.Add(new("Manufactured", Manufactured(Str(id, "YearOfManufacture"), Str(id, "WeekOfManufacture"))));
-                s.Items.Add(new("Physical size", DiagonalInches(par)));
-                s.Items.Add(new("Input type", InputType(par)));
-                sections.Add(s);
+                list.Add(new WmiMonitor(
+                    FriendlyName: Decode(id, "UserFriendlyName"),
+                    Manufacturer: Decode(id, "ManufacturerName"),
+                    Size: DiagonalInches(par),
+                    Year: Year(Str(id, "YearOfManufacture"))));
             }
         }
-        catch { /* root\wmi unavailable — fall through to the desktop section only. */ }
-
-        try { sections.Add(DesktopSection()); }
-        catch { /* ignore */ }
-
-        return sections;
+        catch { /* root\wmi unavailable. */ }
+        return list;
     }
 
-    private static InfoSection DesktopSection()
+    private static WmiMonitor? MatchWmi(List<WmiMonitor> wmi, string friendly, int index)
     {
-        // Primary controller = the one currently driving a desktop mode.
-        var controllers = Wmi(null, "Win32_VideoController");
-        var primary = controllers.FirstOrDefault(c => int.TryParse(Str(c, "CurrentHorizontalResolution"), out var h) && h > 0)
-                      ?? controllers.FirstOrDefault();
-
-        var s = new InfoSection { Title = "Desktop (active mode)" };
-        s.Items.Add(new("Adapter", Str(primary, "Name")));
-        s.Items.Add(new("Resolution",
-            $"{Str(primary, "CurrentHorizontalResolution")} x {Str(primary, "CurrentVerticalResolution")}"));
-        s.Items.Add(new("Refresh rate", Hz(Str(primary, "CurrentRefreshRate"))));
-        s.Items.Add(new("Color depth", BitDepth(Str(primary, "CurrentBitsPerPixel"))));
-        return s;
+        if (wmi.Count == 0) return null;
+        if (friendly is not "—")
+        {
+            var hit = wmi.FirstOrDefault(w =>
+                string.Equals(w.FriendlyName, friendly, StringComparison.OrdinalIgnoreCase));
+            if (hit is not null) return hit;
+        }
+        return wmi.ElementAtOrDefault(index);
     }
 
     // ---- WMI helpers ----
@@ -97,14 +249,8 @@ public static class DisplayInfoService
         catch { return "—"; }
     }
 
-    private static string Manufactured(string year, string week)
-    {
-        var hasYear = int.TryParse(year, out var y) && y > 0;
-        var hasWeek = int.TryParse(week, out var w) && w > 0;
-        if (hasYear && hasWeek) return $"{y}  (week {w})";
-        if (hasYear) return y.ToString();
-        return "—";
-    }
+    private static string Year(string year)
+        => int.TryParse(year, out var y) && y > 0 ? y.ToString() : "—";
 
     /// <summary>Diagonal in inches from Max{Horizontal,Vertical}ImageSize (centimeters).</summary>
     private static string DiagonalInches(ManagementBaseObject? par)
@@ -117,18 +263,143 @@ public static class DisplayInfoService
         return $"{inches:0.#}\"  ({h:0} x {v:0} cm)";
     }
 
-    private static string InputType(ManagementBaseObject? par)
+    private static double ToDouble(string s) => double.TryParse(s, out var v) ? v : 0;
+
+    private static string Clean(string? s)
     {
-        var raw = Str(par, "VideoInputType");
-        return raw switch
-        {
-            "0" => "Analog (VGA)",
-            "1" => "Digital (HDMI/DP)",
-            _ => "—",
-        };
+        var t = s?.Trim();
+        return string.IsNullOrEmpty(t) ? "—" : t;
     }
 
-    private static string Hz(string s) => double.TryParse(s, out var v) && v > 0 ? $"{v:0} Hz" : "—";
-    private static string BitDepth(string s) => int.TryParse(s, out var v) && v > 0 ? $"{v}-bit" : "—";
-    private static double ToDouble(string s) => double.TryParse(s, out var v) ? v : 0;
+    // =====================================================================================
+    //  P/Invoke surface + struct definitions (DisplayConfig).
+    // =====================================================================================
+
+    private const int ERROR_SUCCESS = 0;
+    private const uint QDC_ONLY_ACTIVE_PATHS = 2;
+    private const uint DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME = 2;
+    private const uint DISPLAYCONFIG_MODE_INFO_TYPE_TARGET = 2;
+
+    [DllImport("user32.dll")]
+    private static extern int GetDisplayConfigBufferSizes(
+        uint flags, out uint numPathArrayElements, out uint numModeInfoArrayElements);
+
+    [DllImport("user32.dll")]
+    private static extern int QueryDisplayConfig(
+        uint flags,
+        ref uint numPathArrayElements,
+        [Out] DISPLAYCONFIG_PATH_INFO[] pathArray,
+        ref uint numModeInfoArrayElements,
+        [Out] DISPLAYCONFIG_MODE_INFO[] modeInfoArray,
+        IntPtr currentTopologyId);
+
+    [DllImport("user32.dll")]
+    private static extern int DisplayConfigGetDeviceInfo(ref DISPLAYCONFIG_TARGET_DEVICE_NAME requestPacket);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LUID
+    {
+        public int LowPart;
+        public int HighPart;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DISPLAYCONFIG_RATIONAL
+    {
+        public uint Numerator;
+        public uint Denominator;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DISPLAYCONFIG_2DREGION
+    {
+        public uint cx;
+        public uint cy;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DISPLAYCONFIG_PATH_SOURCE_INFO
+    {
+        public LUID adapterId;
+        public uint id;
+        public uint modeInfoIdx;
+        public uint statusFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DISPLAYCONFIG_PATH_TARGET_INFO
+    {
+        public LUID adapterId;
+        public uint id;
+        public uint modeInfoIdx;
+        public uint outputTechnology;
+        public uint rotation;
+        public uint scaling;
+        public DISPLAYCONFIG_RATIONAL refreshRate;
+        public uint scanLineOrdering;
+        public int targetAvailable;
+        public uint statusFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DISPLAYCONFIG_PATH_INFO
+    {
+        public DISPLAYCONFIG_PATH_SOURCE_INFO sourceInfo;
+        public DISPLAYCONFIG_PATH_TARGET_INFO targetInfo;
+        public uint flags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DISPLAYCONFIG_VIDEO_SIGNAL_INFO
+    {
+        public ulong pixelRate;
+        public DISPLAYCONFIG_RATIONAL hSyncFreq;
+        public DISPLAYCONFIG_RATIONAL vSyncFreq;
+        public DISPLAYCONFIG_2DREGION activeSize;
+        public DISPLAYCONFIG_2DREGION totalSize;
+        public uint videoStandard;      // packed AdditionalSignalInfo union
+        public uint scanLineOrdering;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DISPLAYCONFIG_TARGET_MODE
+    {
+        public DISPLAYCONFIG_VIDEO_SIGNAL_INFO targetVideoSignalInfo;
+    }
+
+    // The native DISPLAYCONFIG_MODE_INFO is: header (infoType,id,adapterId) then an 8-byte-aligned
+    // union of target/source/desktopImage modes. Header occupies 16 bytes, so the union starts at
+    // offset 16. We only need the target mode, so we overlay just that field.
+    [StructLayout(LayoutKind.Explicit)]
+    private struct DISPLAYCONFIG_MODE_INFO
+    {
+        [FieldOffset(0)] public uint infoType;
+        [FieldOffset(4)] public uint id;
+        [FieldOffset(8)] public LUID adapterId;
+        [FieldOffset(16)] public DISPLAYCONFIG_TARGET_MODE targetMode;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DISPLAYCONFIG_DEVICE_INFO_HEADER
+    {
+        public uint type;
+        public uint size;
+        public LUID adapterId;
+        public uint id;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct DISPLAYCONFIG_TARGET_DEVICE_NAME
+    {
+        public DISPLAYCONFIG_DEVICE_INFO_HEADER header;
+        public uint flags;
+        public uint outputTechnology;
+        public ushort edidManufactureId;
+        public ushort edidProductCodeId;
+        public uint connectorInstance;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+        public string monitorFriendlyDeviceName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string monitorDevicePath;
+    }
 }

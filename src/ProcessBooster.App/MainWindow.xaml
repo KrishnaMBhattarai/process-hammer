@@ -19,6 +19,19 @@
             <Setter Property="Opacity" Value="0.85" />
         </Style>
 
+        <SolidColorBrush x:Key="AccentPurple" Color="#8B5CF6" />
+
+        <!-- Tab header text turns purple + semibold when its tab is selected -->
+        <Style x:Key="TabHeaderText" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource AccentPurple}" />
+                    <Setter Property="FontWeight" Value="SemiBold" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- Shared layout for every hardware tab: note + live tiles + detail cards -->
         <DataTemplate DataType="{x:Type vm:HardwareTabViewModel}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8,12,8,8">
@@ -55,7 +68,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <ui:Card Width="478" Margin="4,4,4,12" Padding="18" VerticalAlignment="Top">
+                                <ui:Card Width="560" Margin="4,4,4,12" Padding="18" VerticalAlignment="Top">
                                     <StackPanel>
                                         <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,10" />
                                         <ItemsControl ItemsSource="{Binding Items}">
@@ -63,7 +76,7 @@
                                                 <DataTemplate>
                                                     <Grid Margin="0,3">
                                                         <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="160" />
+                                                            <ColumnDefinition Width="150" />
                                                             <ColumnDefinition Width="*" />
                                                         </Grid.ColumnDefinitions>
                                                         <TextBlock Grid.Column="0" Text="{Binding Label}" Opacity="0.6" TextWrapping="Wrap" />
@@ -96,13 +109,18 @@
         </ui:TitleBar>
 
         <TabControl Grid.Row="1" Margin="12,4,12,6" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
+            <TabControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <UniformGrid Rows="1" />
+                </ItemsPanelTemplate>
+            </TabControl.ItemsPanel>
 
             <!-- ============================ PROCESSES ============================ -->
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Apps24" Margin="0,0,8,0" />
-                        <TextBlock Text="Processes" VerticalAlignment="Center" />
+                        <TextBlock Text="Processes" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
                 <Grid Margin="4,8,4,0">
@@ -155,9 +173,21 @@
                                       VirtualizingPanel.VirtualizationMode="Recycling"
                                       ScrollViewer.CanContentScroll="True"
                                       ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <DataGrid.Resources>
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#8B5CF6" />
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#8B5CF6" />
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White" />
+                                    <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="White" />
+                                </DataGrid.Resources>
                                 <DataGrid.RowStyle>
                                     <Style TargetType="DataGridRow">
                                         <Setter Property="ToolTip" Value="{Binding ExePath}" />
+                                        <Style.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Background" Value="{StaticResource AccentPurple}" />
+                                                <Setter Property="Foreground" Value="White" />
+                                            </Trigger>
+                                        </Style.Triggers>
                                     </Style>
                                 </DataGrid.RowStyle>
                                 <DataGrid.ContextMenu>
@@ -250,7 +280,7 @@
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Board24" Margin="0,0,8,0" />
-                        <TextBlock Text="System" VerticalAlignment="Center" />
+                        <TextBlock Text="System" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
@@ -258,7 +288,7 @@
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="DeveloperBoard24" Margin="0,0,8,0" />
-                        <TextBlock Text="CPU" VerticalAlignment="Center" />
+                        <TextBlock Text="CPU" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
@@ -266,7 +296,7 @@
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Memory16" Margin="0,0,8,0" />
-                        <TextBlock Text="Memory" VerticalAlignment="Center" />
+                        <TextBlock Text="Memory" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
@@ -274,7 +304,7 @@
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Games24" Margin="0,0,8,0" />
-                        <TextBlock Text="Graphics" VerticalAlignment="Center" />
+                        <TextBlock Text="Graphics" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
@@ -282,7 +312,7 @@
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Desktop24" Margin="0,0,8,0" />
-                        <TextBlock Text="Display" VerticalAlignment="Center" />
+                        <TextBlock Text="Display" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
@@ -290,7 +320,7 @@
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="HardDrive24" Margin="0,0,8,0" />
-                        <TextBlock Text="Storage" VerticalAlignment="Center" />
+                        <TextBlock Text="Storage" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
@@ -298,7 +328,7 @@
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Globe24" Margin="0,0,8,0" />
-                        <TextBlock Text="Network" VerticalAlignment="Center" />
+                        <TextBlock Text="Network" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>

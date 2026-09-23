@@ -19,7 +19,7 @@ public static class MemoryInfoService
             var modules = All("Win32_PhysicalMemory");
 
             var sections = new List<InfoSection> { OverviewSection(cs, array, modules) };
-            sections.Add(ModulesSection(modules));
+            sections.AddRange(ModuleSections(modules));
             return sections;
         }
         catch
@@ -74,51 +74,51 @@ public static class MemoryInfoService
         return s;
     }
 
-    private static InfoSection ModulesSection(List<ManagementBaseObject> modules)
+    /// <summary>One clean card per populated module, with short label/value rows that don't wrap.</summary>
+    private static IEnumerable<InfoSection> ModuleSections(List<ManagementBaseObject> modules)
     {
-        var s = new InfoSection { Title = "Modules" };
-        if (modules.Count == 0)
-        {
-            s.Items.Add(new("Modules", "—"));
-            return s;
-        }
+        var populated = modules
+            .Where(m => ulong.TryParse(Str(m, "Capacity"), out var c) && c > 0)
+            .ToList();
+        if (populated.Count == 0)
+            return new[] { new InfoSection { Title = "Modules", Items = { new("Modules", "—") } } };
 
+        var list = new List<InfoSection>();
         var i = 1;
-        foreach (var m in modules)
+        foreach (var m in populated)
         {
-            var cap = ulong.TryParse(Str(m, "Capacity"), out var c) && c > 0 ? Gb(c) : "—";
+            var s = new InfoSection { Title = $"Module {i++}" };
+
+            if (ulong.TryParse(Str(m, "Capacity"), out var c) && c > 0) s.Items.Add(new("Capacity", Gb(c)));
+            s.Items.Add(new("Type", MemoryTypeOf(m)));
+            s.Items.Add(new("Form factor", FormFactorOf(m)));
+
             var speed = Str(m, "Speed");
-            var slot = Str(m, "DeviceLocator");
-            var label = slot is not "—" ? $"Module {i} ({slot})" : $"Module {i}";
-            i++;
+            if (speed is not "—") s.Items.Add(new("Speed", $"{speed} MT/s"));
+            var configured = Str(m, "ConfiguredClockSpeed");
+            if (configured is not "—" && configured != speed) s.Items.Add(new("Configured", $"{configured} MT/s"));
 
-            // Primary row: capacity @ speed · type · form factor.
-            s.Items.Add(new(label,
-                $"{cap} @ {(speed is not "—" ? speed + " MT/s" : "— MT/s")}  ·  " +
-                $"{MemoryTypeOf(m)}  ·  {FormFactorOf(m)}"));
+            AddIf(s, "Manufacturer", Str(m, "Manufacturer"));
+            AddIf(s, "Part number", Str(m, "PartNumber"));
+            AddIf(s, "Slot", Str(m, "DeviceLocator"));
+            AddIf(s, "Bank", Str(m, "BankLabel"));
 
-            // Detail row: manufacturer · part number · bank.
-            var mfr = Str(m, "Manufacturer");
-            var part = Str(m, "PartNumber");
-            var bank = Str(m, "BankLabel");
-            var detail = $"{mfr}  ·  {part}";
-            if (bank is not "—") detail += $"  ·  {bank}";
-            s.Items.Add(new("  Details", detail));
-
-            // Electrical row: widths · configured clock · voltage · serial.
             var dataW = Str(m, "DataWidth");
             var totalW = Str(m, "TotalWidth");
-            var width = dataW is not "—" && totalW is not "—"
-                ? $"{dataW}/{totalW}-bit"
-                : (dataW is not "—" ? $"{dataW}-bit" : "—");
-            var configured = Str(m, "ConfiguredClockSpeed");
+            if (dataW is not "—")
+                s.Items.Add(new("Width", totalW is not "—" ? $"{dataW}/{totalW}-bit" : $"{dataW}-bit"));
+
             var volts = MilliVolts(Str(m, "ConfiguredVoltage"));
-            var serial = Str(m, "SerialNumber");
-            s.Items.Add(new("  Electrical",
-                $"width {width}  ·  configured {(configured is not "—" ? configured + " MT/s" : "—")}" +
-                $"  ·  {volts}  ·  S/N {serial}"));
+            if (volts is not "—") s.Items.Add(new("Voltage", volts));
+
+            list.Add(s);
         }
-        return s;
+        return list;
+    }
+
+    private static void AddIf(InfoSection s, string label, string value)
+    {
+        if (value is not "—") s.Items.Add(new(label, value));
     }
 
     // ---- WMI helpers ----
