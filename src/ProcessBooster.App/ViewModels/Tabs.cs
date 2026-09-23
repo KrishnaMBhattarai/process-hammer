@@ -125,3 +125,24 @@ public sealed class SensorsTabViewModel : ViewModelBase, ITab
         }
     }
 }
+
+/// <summary>A tab that renders one or more <see cref="DataTable"/>s as sortable data grids (loaded once).</summary>
+public sealed class TableTabViewModel : ViewModelBase, ITab
+{
+    private readonly Func<List<DataTable>> _collect;
+    private bool _loaded;
+
+    public ObservableCollection<DataTable> Tables { get; } = new();
+
+    public TableTabViewModel(Func<List<DataTable>> collect) => _collect = collect;
+
+    public async void Activate()
+    {
+        if (_loaded) return;
+        _loaded = true;
+        var tables = await Task.Run(_collect);   // WMI/registry off the UI thread
+        foreach (var t in tables) Tables.Add(t);
+    }
+
+    public void Deactivate() { }
+}

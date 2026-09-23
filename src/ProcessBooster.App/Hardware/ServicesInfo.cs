@@ -5,11 +5,11 @@ namespace ProcessBooster.App.Hardware;
 /// <summary>
 /// Collects the Windows service inventory via WMI (Win32_Service). Every query is defensive: a
 /// missing class or property yields "—" rather than throwing, so partial data still renders and
-/// <see cref="Collect"/> never propagates an exception.
+/// <see cref="CollectTables"/> never propagates an exception.
 /// </summary>
 public static class ServicesInfoService
 {
-    public static List<InfoSection> Collect()
+    public static List<DataTable> CollectTables()
     {
         try
         {
@@ -25,24 +25,29 @@ public static class ServicesInfoService
                 .OrderBy(s => Str(s, "DisplayName"), StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            var summary = new InfoSection { Title = "Services" };
-            summary.Items.Add(new("Total", services.Count.ToString()));
-            summary.Items.Add(new("Running", running.Count.ToString()));
-            summary.Items.Add(new("Stopped", stopped.Count.ToString()));
+            var runningRows = running
+                .Select(s => new[] { Str(s, "DisplayName"), Str(s, "StartMode"), Str(s, "StartName") })
+                .ToList();
 
-            var runningSection = new InfoSection { Title = $"Running services ({running.Count})" };
-            foreach (var s in running)
-                runningSection.Items.Add(new(Str(s, "DisplayName"), $"{Str(s, "StartMode")} · {Str(s, "StartName")}"));
+            var stoppedRows = stopped
+                .Select(s => new[] { Str(s, "DisplayName"), Str(s, "State"), Str(s, "StartMode") })
+                .ToList();
 
-            var stoppedSection = new InfoSection { Title = $"Stopped services ({stopped.Count})" };
-            foreach (var s in stopped)
-                stoppedSection.Items.Add(new(Str(s, "DisplayName"), $"{Str(s, "State")} · {Str(s, "StartMode")}"));
+            var runningTable = new DataTable(
+                $"Running ({running.Count})",
+                new[] { "Service", "Start type", "Account" },
+                runningRows);
 
-            return new List<InfoSection> { summary, runningSection, stoppedSection };
+            var stoppedTable = new DataTable(
+                $"Stopped ({stopped.Count})",
+                new[] { "Service", "State", "Start type" },
+                stoppedRows);
+
+            return new List<DataTable> { runningTable, stoppedTable };
         }
         catch
         {
-            return new List<InfoSection>();
+            return new List<DataTable>();
         }
     }
 

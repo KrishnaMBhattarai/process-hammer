@@ -5,45 +5,46 @@ namespace ProcessBooster.App.Hardware;
 /// <summary>
 /// Enumerates installed software from the registry Uninstall keys (64-bit, 32-bit and per-user
 /// views). Every registry read is defensive: a missing hive, key or value is skipped rather than
-/// throwing, so partial data still renders and <see cref="Collect"/> never fails.
+/// throwing, so partial data still renders and <see cref="CollectTables"/> never fails.
 /// </summary>
 public static class SoftwareInfoService
 {
     private const string UninstallPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
     private const string UninstallPathWow = @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall";
 
-    public static List<InfoSection> Collect()
+    public static List<DataTable> CollectTables()
     {
-        var programs = new Dictionary<string, Program>(StringComparer.OrdinalIgnoreCase);
-
         try
         {
+            var programs = new Dictionary<string, Program>(StringComparer.OrdinalIgnoreCase);
+
             ReadHive(RegistryHive.LocalMachine, RegistryView.Registry64, UninstallPath, programs);
             ReadHive(RegistryHive.LocalMachine, RegistryView.Registry32, UninstallPathWow, programs);
             ReadHive(RegistryHive.CurrentUser, RegistryView.Registry64, UninstallPath, programs);
+
+            var sorted = programs.Values
+                .OrderBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var columns = new[] { "Name", "Version", "Publisher", "Installed" };
+            var rows = new List<string[]>(sorted.Count);
+            foreach (var p in sorted)
+                rows.Add(new[] { p.DisplayName, p.Version, p.Publisher, p.InstallDate });
+
+            var table = new DataTable(
+                $"Installed software ({sorted.Count})",
+                columns,
+                rows);
+
+            return new List<DataTable> { table };
         }
-        catch { /* never throw */ }
-
-        var sorted = programs.Values
-            .OrderBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        var section = new InfoSection { Title = $"Installed software ({sorted.Count})" };
-        foreach (var p in sorted)
-            section.Items.Add(new(p.DisplayName, FormatValue(p)));
-
-        return new List<InfoSection> { section };
+        catch
+        {
+            return new List<DataTable>();
+        }
     }
 
     private sealed record Program(string DisplayName, string Version, string Publisher, string InstallDate);
-
-    private static string FormatValue(Program p)
-    {
-        var value = $"{p.Version}  ·  {p.Publisher}";
-        if (p.InstallDate is { Length: > 0 } && p.InstallDate != "—")
-            value += $"  ·  {p.InstallDate}";
-        return value;
-    }
 
     private static void ReadHive(RegistryHive hive, RegistryView view, string path, Dictionary<string, Program> programs)
     {

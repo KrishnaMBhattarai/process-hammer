@@ -1,7 +1,7 @@
 <Project>
   <!-- Shared properties for every project in the solution. Bump <Version> here to release. -->
   <PropertyGroup>
-    <Version>0.8.0</Version>
+    <Version>0.9.0</Version>
     <Product>Process Booster</Product>
     <Authors>Process Booster contributors</Authors>
     <TargetFramework>net8.0-windows</TargetFramework>

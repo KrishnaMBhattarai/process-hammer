@@ -4,6 +4,7 @@
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  xmlns:core="clr-namespace:ProcessBooster.Core.Models;assembly=ProcessBooster.Core"
                  xmlns:vm="clr-namespace:ProcessBooster.App.ViewModels"
+                 xmlns:beh="clr-namespace:ProcessBooster.App.Behaviors"
                  Title="Process Booster"
                  Width="1400" Height="840" MinWidth="1120" MinHeight="640"
                  WindowStartupLocation="CenterScreen"
@@ -164,6 +165,38 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </StackPanel>
+            </ScrollViewer>
+        </DataTemplate>
+
+        <!-- Table tabs: Startup / Software / Services / Environment as sortable data grids -->
+        <DataTemplate DataType="{x:Type vm:TableTabViewModel}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10,12,10,8">
+                <ItemsControl ItemsSource="{Binding Tables}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,0,0,16">
+                                <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Margin="2,0,0,8" />
+                                <ui:Card Padding="0">
+                                    <DataGrid ItemsSource="{Binding Rows}"
+                                              beh:GridColumns.Headers="{Binding Columns}"
+                                              AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
+                                              GridLinesVisibility="Horizontal" CanUserResizeRows="False" CanUserAddRows="False"
+                                              CanUserResizeColumns="True" CanUserSortColumns="True"
+                                              SelectionMode="Single" SelectionUnit="FullRow" RowHeight="28"
+                                              Background="Transparent" BorderThickness="0" MaxHeight="640"
+                                              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                                              ScrollViewer.CanContentScroll="True" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                        <DataGrid.Resources>
+                                            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#8B5CF6" />
+                                            <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#8B5CF6" />
+                                            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White" />
+                                        </DataGrid.Resources>
+                                    </DataGrid>
+                                </ui:Card>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </ScrollViewer>
         </DataTemplate>
     </Window.Resources>

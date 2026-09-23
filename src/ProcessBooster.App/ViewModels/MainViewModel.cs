@@ -45,11 +45,11 @@ public sealed class MainViewModel : ViewModelBase
     public HardwareTabViewModel NetworkTab { get; }
     public HardwareTabViewModel SecurityTab { get; }
     public HardwareTabViewModel UsersTab { get; }
-    public HardwareTabViewModel StartupTab { get; }
-    public HardwareTabViewModel SoftwareTab { get; }
-    public HardwareTabViewModel ServicesTab { get; }
+    public TableTabViewModel StartupTab { get; }
+    public TableTabViewModel SoftwareTab { get; }
+    public TableTabViewModel ServicesTab { get; }
     public HardwareTabViewModel DevicesTab { get; }
-    public HardwareTabViewModel EnvironmentTab { get; }
+    public TableTabViewModel EnvironmentTab { get; }
     public HardwareTabViewModel PowerTab { get; }
     public SensorsTabViewModel SensorsTab { get; }
 
@@ -141,11 +141,11 @@ public sealed class MainViewModel : ViewModelBase
         OsTab = new HardwareTabViewModel(OsInfoService.Collect);
         SecurityTab = new HardwareTabViewModel(SecurityInfoService.Collect);
         UsersTab = new HardwareTabViewModel(UsersInfoService.Collect);
-        StartupTab = new HardwareTabViewModel(StartupInfoService.Collect);
-        SoftwareTab = new HardwareTabViewModel(SoftwareInfoService.Collect);
-        ServicesTab = new HardwareTabViewModel(ServicesInfoService.Collect);
+        StartupTab = new TableTabViewModel(StartupInfoService.CollectTables);
+        SoftwareTab = new TableTabViewModel(SoftwareInfoService.CollectTables);
+        ServicesTab = new TableTabViewModel(ServicesInfoService.CollectTables);
         DevicesTab = new HardwareTabViewModel(DevicesInfoService.Collect);
-        EnvironmentTab = new HardwareTabViewModel(EnvironmentInfoService.Collect);
+        EnvironmentTab = new TableTabViewModel(EnvironmentInfoService.CollectTables);
         PowerTab = new HardwareTabViewModel(PowerInfoService.Collect);
         SensorsTab = new SensorsTabViewModel(monitor, note);
 
