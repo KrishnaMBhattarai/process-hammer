@@ -1,0 +1,17 @@
+# Build output
+bin/
+obj/
+*.user
+.vs/
+
+# Publish
+publish/
+*.zip
+
+# Logs / local config produced at runtime
+*.log
+processbooster.config.local.json
+
+# OS
+.DS_Store
+Thumbs.db

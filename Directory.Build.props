@@ -1,0 +1,15 @@
+<Project>
+  <!-- Shared properties for every project in the solution. Bump <Version> here to release. -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <Product>Process Booster</Product>
+    <Authors>Process Booster contributors</Authors>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+</Project>
