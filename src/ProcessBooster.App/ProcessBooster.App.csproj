@@ -6,6 +6,7 @@
     <RootNamespace>ProcessBooster.App</RootNamespace>
     <AssemblyName>ProcessBooster</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
