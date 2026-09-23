@@ -45,6 +45,11 @@ public sealed class MainViewModel : ViewModelBase
     public HardwareTabViewModel NetworkTab { get; }
     public HardwareTabViewModel SecurityTab { get; }
     public HardwareTabViewModel UsersTab { get; }
+    public HardwareTabViewModel StartupTab { get; }
+    public HardwareTabViewModel SoftwareTab { get; }
+    public HardwareTabViewModel ServicesTab { get; }
+    public HardwareTabViewModel DevicesTab { get; }
+    public HardwareTabViewModel EnvironmentTab { get; }
     public HardwareTabViewModel PowerTab { get; }
     public SensorsTabViewModel SensorsTab { get; }
 
@@ -136,13 +141,19 @@ public sealed class MainViewModel : ViewModelBase
         OsTab = new HardwareTabViewModel(OsInfoService.Collect);
         SecurityTab = new HardwareTabViewModel(SecurityInfoService.Collect);
         UsersTab = new HardwareTabViewModel(UsersInfoService.Collect);
+        StartupTab = new HardwareTabViewModel(StartupInfoService.Collect);
+        SoftwareTab = new HardwareTabViewModel(SoftwareInfoService.Collect);
+        ServicesTab = new HardwareTabViewModel(ServicesInfoService.Collect);
+        DevicesTab = new HardwareTabViewModel(DevicesInfoService.Collect);
+        EnvironmentTab = new HardwareTabViewModel(EnvironmentInfoService.Collect);
         PowerTab = new HardwareTabViewModel(PowerInfoService.Collect);
         SensorsTab = new SensorsTabViewModel(monitor, note);
 
         // Index 0 = Processes (no hardware VM); the rest map to tabs in the same order as the XAML.
         _tabByIndex = new ITab?[]
         {
-            null, SystemTab, OsTab, SecurityTab, UsersTab, CpuTab, MemoryTab, GraphicsTab,
+            null, SystemTab, OsTab, SecurityTab, UsersTab, StartupTab, SoftwareTab, ServicesTab,
+            DevicesTab, EnvironmentTab, CpuTab, MemoryTab, GraphicsTab,
             DisplayTab, StorageTab, NetworkTab, SensorsTab, PowerTab,
         };
 

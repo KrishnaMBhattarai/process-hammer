@@ -381,6 +381,46 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
+            <TabItem Content="{Binding StartupTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Power24" Style="{StaticResource TabIcon}" />
+                        <TextBlock Text="Startup" Style="{StaticResource TabHeaderText}" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding SoftwareTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="AppsList24" Style="{StaticResource TabIcon}" />
+                        <TextBlock Text="Software" Style="{StaticResource TabHeaderText}" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding ServicesTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Wrench24" Style="{StaticResource TabIcon}" />
+                        <TextBlock Text="Services" Style="{StaticResource TabHeaderText}" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding DevicesTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="UsbPlug24" Style="{StaticResource TabIcon}" />
+                        <TextBlock Text="Devices" Style="{StaticResource TabHeaderText}" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding EnvironmentTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Code24" Style="{StaticResource TabIcon}" />
+                        <TextBlock Text="Environment" Style="{StaticResource TabHeaderText}" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
             <TabItem Content="{Binding CpuTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
