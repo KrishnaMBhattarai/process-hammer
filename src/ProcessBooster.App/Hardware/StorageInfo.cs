@@ -4,60 +4,69 @@ using System.Management;
 namespace ProcessBooster.App.Hardware;
 
 /// <summary>
-/// Collects storage detail: physical disks (via the modern root\Microsoft\Windows\Storage
-/// namespace, falling back to Win32_DiskDrive) and mounted volumes (via System.IO.DriveInfo).
-/// Every query is defensive: a missing namespace, class or property yields "—" rather than
-/// throwing, so partial data still renders. <see cref="Collect"/> never throws.
+/// Collects storage detail as pretty, well-spaced sections: one section per physical disk
+/// (via the modern root\Microsoft\Windows\Storage namespace, falling back to Win32_DiskDrive)
+/// and one "Volumes" section (via System.IO.DriveInfo). Every query is defensive: a missing
+/// namespace, class or property yields "—" or a skipped row rather than throwing, so partial
+/// data still renders. <see cref="Collect"/> never throws.
 /// </summary>
 public static class StorageInfoService
 {
     public static List<InfoSection> Collect()
     {
         var sections = new List<InfoSection>();
-        try { sections.Add(PhysicalDisksSection()); } catch { /* never throw */ }
+        try { sections.AddRange(PhysicalDiskSections()); } catch { /* never throw */ }
         try { sections.Add(VolumesSection()); } catch { /* never throw */ }
         return sections;
     }
 
-    // ---- Physical disks ----
+    // ---- Physical disks: one section each ----
 
-    private static InfoSection PhysicalDisksSection()
+    private static List<InfoSection> PhysicalDiskSections()
     {
-        var s = new InfoSection { Title = "Physical disks" };
-
         // Best source: the modern Storage namespace. May be unavailable on some systems.
         var disks = StorageQuery("MSFT_PhysicalDisk");
         if (disks.Count > 0)
-        {
-            var i = 1;
-            foreach (var d in disks)
-            {
-                var name = Str(d, "FriendlyName");
-                var type = DiskType(Str(d, "MediaType"), Str(d, "BusType"));
-                var size = ulong.TryParse(Str(d, "Size"), out var sz) ? Bytes(sz) : "—";
-                var health = HealthStatus(Str(d, "HealthStatus"));
-                var bus = BusType(Str(d, "BusType"));
-                s.Items.Add(new($"Disk {i++}", $"{name}  ·  {type}  ·  {size}  ·  {health}  ·  {bus}"));
-            }
-            return s;
-        }
+            return disks.Select(ModernDiskSection).ToList();
 
         // Fallback: legacy Win32_DiskDrive.
-        var j = 1;
-        foreach (var d in All("Win32_DiskDrive"))
-        {
-            var model = Str(d, "Model").Trim();
-            var size = ulong.TryParse(Str(d, "Size"), out var sz) ? Bytes(sz) : "—";
-            var iface = Str(d, "InterfaceType");
-            var media = Str(d, "MediaType");
-            var parts = Str(d, "Partitions");
-            var serial = Str(d, "SerialNumber").Trim();
-            s.Items.Add(new($"Disk {j++}",
-                $"{model}  ·  {size}  ·  {iface}  ·  {media}  ·  {parts} partitions  ·  SN {serial}"));
-        }
+        var legacy = All("Win32_DiskDrive");
+        if (legacy.Count > 0)
+            return legacy.Select(LegacyDiskSection).ToList();
 
-        if (s.Items.Count == 0)
-            s.Items.Add(new("Disks", "—"));
+        return new() { new InfoSection { Title = "Disks", Items = { new("Disks", "—") } } };
+    }
+
+    private static InfoSection ModernDiskSection(ManagementBaseObject d, int index)
+    {
+        var name = Str(d, "FriendlyName");
+        var s = new InfoSection { Title = $"Disk {index + 1} — {name}" };
+
+        Add(s, "Model", name);
+        Add(s, "Type", DiskType(Str(d, "MediaType"), Str(d, "BusType"), Str(d, "SpindleSpeed")));
+        Add(s, "Size", ulong.TryParse(Str(d, "Size"), out var sz) ? Bytes(sz) : "—");
+        Add(s, "Bus", BusType(Str(d, "BusType")));
+        Add(s, "Health", HealthStatus(Str(d, "HealthStatus")));
+        Add(s, "Firmware", Str(d, "FirmwareVersion"));
+        Add(s, "Serial", Str(d, "SerialNumber"));
+
+        if (s.Items.Count == 0) s.Items.Add(new("Disk", "—"));
+        return s;
+    }
+
+    private static InfoSection LegacyDiskSection(ManagementBaseObject d, int index)
+    {
+        var model = Str(d, "Model");
+        var s = new InfoSection { Title = $"Disk {index + 1} — {model}" };
+
+        Add(s, "Model", model);
+        Add(s, "Type", LegacyType(Str(d, "InterfaceType")));
+        Add(s, "Size", ulong.TryParse(Str(d, "Size"), out var sz) ? Bytes(sz) : "—");
+        Add(s, "Bus", Str(d, "InterfaceType"));
+        Add(s, "Firmware", Str(d, "FirmwareRevision"));
+        Add(s, "Serial", Str(d, "SerialNumber"));
+
+        if (s.Items.Count == 0) s.Items.Add(new("Disk", "—"));
         return s;
     }
 
@@ -81,12 +90,14 @@ public static class StorageInfoService
                 var free = d.TotalFreeSpace;
                 var used = total - free;
                 var pctFree = total > 0 ? free * 100.0 / total : 0;
-                var label = string.IsNullOrWhiteSpace(d.VolumeLabel) ? "—" : d.VolumeLabel.Trim();
+
+                var letter = d.Name.TrimEnd('\\');
+                var vol = string.IsNullOrWhiteSpace(d.VolumeLabel) ? "" : $" {d.VolumeLabel.Trim()}";
                 var fmt = string.IsNullOrWhiteSpace(d.DriveFormat) ? "—" : d.DriveFormat;
 
                 s.Items.Add(new(
-                    $"{d.Name}  ({label})",
-                    $"{fmt}  ·  {Bytes(used)} used / {Bytes(total)} ({pctFree:0.#}% free)"));
+                    $"{letter}{vol}",
+                    $"{Bytes(used)} / {Bytes(total)}  ({pctFree:0.#}% free)  ·  {fmt}"));
             }
             catch { /* skip volumes that vanish mid-enumeration */ }
         }
@@ -94,6 +105,15 @@ public static class StorageInfoService
         if (s.Items.Count == 0)
             s.Items.Add(new("Volumes", "—"));
         return s;
+    }
+
+    // ---- Section helper ----
+
+    /// <summary>Append a row only when the value is present (not "—" / empty).</summary>
+    private static void Add(InfoSection s, string label, string value)
+    {
+        if (!string.IsNullOrWhiteSpace(value) && value != "—")
+            s.Items.Add(new(label, value));
     }
 
     // ---- WMI helpers ----
@@ -170,17 +190,32 @@ public static class StorageInfoService
     };
 
     /// <summary>
-    /// Combine MediaType and BusType into a friendly type. NVMe is a bus (always SSD) but is the
-    /// most useful label; otherwise prefer the media type, falling back to the bus type.
+    /// Combine MediaType, BusType and SpindleSpeed into a friendly type. NVMe is a bus but always
+    /// implies SSD, so it reads best as "NVMe SSD". Otherwise prefer the media type; when that's
+    /// missing, infer HDD from a non-zero spindle speed, else fall back to the bus type.
     /// </summary>
-    private static string DiskType(string mediaType, string busType)
+    private static string DiskType(string mediaType, string busType, string spindleSpeed)
     {
-        if (busType == "17") return "NVMe";
         var media = MediaType(mediaType);
+
+        if (busType == "17") // NVMe
+            return media == "SSD" || media.Length == 0 ? "NVMe SSD" : $"NVMe {media}";
+
         if (media.Length > 0) return media;
+
+        // No media type reported: a spinning disk reports a non-zero spindle speed.
+        if (ulong.TryParse(spindleSpeed, out var rpm) && rpm > 0) return "HDD";
+
         var bus = BusType(busType);
         return bus == "—" ? "—" : bus;
     }
+
+    /// <summary>Best-effort type label from a legacy Win32_DiskDrive.InterfaceType.</summary>
+    private static string LegacyType(string iface) => iface switch
+    {
+        "—" => "—",
+        _ => iface,
+    };
 
     // ---- Formatting ----
 

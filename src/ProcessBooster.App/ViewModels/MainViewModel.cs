@@ -36,6 +36,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly HardwareTabViewModel?[] _tabByIndex;
 
     public HardwareTabViewModel SystemTab { get; }
+    public HardwareTabViewModel OsTab { get; }
     public HardwareTabViewModel CpuTab { get; }
     public HardwareTabViewModel MemoryTab { get; }
     public HardwareTabViewModel GraphicsTab { get; }
@@ -84,7 +85,7 @@ public sealed class MainViewModel : ViewModelBase
         }, note);
 
         CpuTab = new HardwareTabViewModel(
-            () => { var l = CpuInfoService.Collect(); l.Add(CpuCoresSection(topology)); return l; },
+            () => { var l = CpuInfoService.Collect(); l.AddRange(CpuCoreSections(topology)); return l; },
             monitor, Cpu(), note);
 
         MemoryTab = new HardwareTabViewModel(MemoryInfoService.Collect, monitor, new[]
@@ -110,8 +111,10 @@ public sealed class MainViewModel : ViewModelBase
             ("Upload", m => Live.Mbps(m.NetUpMbps)),
         }, note);
 
-        // Index 0 = Processes (no hardware VM); 1..7 map to the hardware tabs, in the same order as the XAML.
-        _tabByIndex = new[] { null, SystemTab, CpuTab, MemoryTab, GraphicsTab, DisplayTab, StorageTab, NetworkTab };
+        OsTab = new HardwareTabViewModel(OsInfoService.Collect);
+
+        // Index 0 = Processes (no hardware VM); 1..8 map to the hardware tabs, in the same order as the XAML.
+        _tabByIndex = new[] { null, SystemTab, OsTab, CpuTab, MemoryTab, GraphicsTab, DisplayTab, StorageTab, NetworkTab };
 
         ProcessView = CollectionViewSource.GetDefaultView(Processes);
         ProcessView.Filter = FilterProcess;
@@ -160,22 +163,31 @@ public sealed class MainViewModel : ViewModelBase
         else if (newIndex > 0 && newIndex < _tabByIndex.Length) _tabByIndex[newIndex]?.Activate();
     }
 
-    /// <summary>Live per-logical-processor list with P/E-core classification (generic, from the OS topology).</summary>
-    private static InfoSection CpuCoresSection(CpuTopology topo)
+    /// <summary>
+    /// Per-logical-processor listing. On a hybrid CPU, Performance and Efficiency cores are returned as
+    /// two separate sections (rendered as two side-by-side columns); otherwise one section. Fully generic —
+    /// the P/E split comes from the OS-reported EfficiencyClass, nothing hardcoded to a particular chip.
+    /// </summary>
+    private static IEnumerable<InfoSection> CpuCoreSections(CpuTopology topo)
     {
-        var s = new InfoSection { Title = "Logical processors" };
         var sets = topo.Sets.OrderBy(x => x.LogicalProcessorIndex).ToList();
-        if (sets.Count == 0) { s.Items.Add(new InfoItem("Cores", "—")); return s; }
+        if (sets.Count == 0)
+            return new[] { new InfoSection { Title = "Logical processors", Items = { new InfoItem("Cores", "—") } } };
 
         var maxEff = sets.Max(x => x.EfficiencyClass);
-        var minEff = sets.Min(x => x.EfficiencyClass);
-        var hybrid = maxEff != minEff;
-        foreach (var c in sets)
+        if (maxEff == sets.Min(x => x.EfficiencyClass))
         {
-            var kind = !hybrid ? "Standard" : c.EfficiencyClass == maxEff ? "Performance" : "Efficiency";
-            s.Items.Add(new InfoItem($"CPU {c.LogicalProcessorIndex}", $"Core {c.CoreIndex} · {kind}"));
+            var one = new InfoSection { Title = "Logical processors" };
+            foreach (var c in sets) one.Items.Add(new InfoItem($"CPU {c.LogicalProcessorIndex}", $"Core {c.CoreIndex}"));
+            return new[] { one };
         }
-        return s;
+
+        var perf = new InfoSection { Title = "Performance cores" };
+        var eff = new InfoSection { Title = "Efficiency cores" };
+        foreach (var c in sets)
+            (c.EfficiencyClass == maxEff ? perf : eff).Items.Add(
+                new InfoItem($"CPU {c.LogicalProcessorIndex}", $"Core {c.CoreIndex}"));
+        return new[] { perf, eff };
     }
 
     // ---- selection ----

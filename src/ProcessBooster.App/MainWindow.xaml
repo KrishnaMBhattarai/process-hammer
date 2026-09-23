@@ -21,6 +21,11 @@
 
         <SolidColorBrush x:Key="AccentPurple" Color="#8B5CF6" />
 
+        <Style x:Key="TabIcon" TargetType="ui:SymbolIcon">
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+
         <!-- Tab header text turns purple + semibold when its tab is selected -->
         <Style x:Key="TabHeaderText" TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center" />
@@ -119,7 +124,7 @@
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Apps24" Margin="0,0,8,0" />
+                        <ui:SymbolIcon Symbol="Apps24" Style="{StaticResource TabIcon}" />
                         <TextBlock Text="Processes" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
@@ -279,15 +284,23 @@
             <TabItem Content="{Binding SystemTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Board24" Margin="0,0,8,0" />
+                        <ui:SymbolIcon Symbol="Board24" Style="{StaticResource TabIcon}" />
                         <TextBlock Text="System" Style="{StaticResource TabHeaderText}" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding OsTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="DesktopTower24" Style="{StaticResource TabIcon}" />
+                        <TextBlock Text="OS" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
             <TabItem Content="{Binding CpuTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="DeveloperBoard24" Margin="0,0,8,0" />
+                        <ui:SymbolIcon Symbol="DeveloperBoard24" Style="{StaticResource TabIcon}" />
                         <TextBlock Text="CPU" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
@@ -295,7 +308,7 @@
             <TabItem Content="{Binding MemoryTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Memory16" Margin="0,0,8,0" />
+                        <ui:SymbolIcon Symbol="Memory16" Style="{StaticResource TabIcon}" />
                         <TextBlock Text="Memory" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
@@ -303,7 +316,7 @@
             <TabItem Content="{Binding GraphicsTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Games24" Margin="0,0,8,0" />
+                        <ui:SymbolIcon Symbol="Games24" Style="{StaticResource TabIcon}" />
                         <TextBlock Text="Graphics" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
@@ -311,7 +324,7 @@
             <TabItem Content="{Binding DisplayTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Desktop24" Margin="0,0,8,0" />
+                        <ui:SymbolIcon Symbol="Desktop24" Style="{StaticResource TabIcon}" />
                         <TextBlock Text="Display" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
@@ -319,7 +332,7 @@
             <TabItem Content="{Binding StorageTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="HardDrive24" Margin="0,0,8,0" />
+                        <ui:SymbolIcon Symbol="Storage24" Style="{StaticResource TabIcon}" />
                         <TextBlock Text="Storage" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
@@ -327,7 +340,7 @@
             <TabItem Content="{Binding NetworkTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="Globe24" Margin="0,0,8,0" />
+                        <ui:SymbolIcon Symbol="Globe24" Style="{StaticResource TabIcon}" />
                         <TextBlock Text="Network" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>

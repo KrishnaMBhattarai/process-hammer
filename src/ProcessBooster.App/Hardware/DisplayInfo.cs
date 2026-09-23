@@ -7,7 +7,8 @@ namespace ProcessBooster.App.Hardware;
 /// Collects per-monitor display detail. The physical <b>connection type</b> (HDMI / DisplayPort /
 /// DVI / VGA / internal) can only be read reliably from the Windows DisplayConfig API
 /// (user32.dll), which is the primary source here: it enumerates the active display paths and
-/// yields each target's friendly name, connector technology, and active resolution @ refresh.
+/// yields each target's friendly name, connector technology, active resolution, refresh rate,
+/// orientation, primary flag, and advanced-colour state (HDR + bits-per-channel + colour encoding).
 /// WMI (<c>root\wmi</c> WmiMonitorID / WmiMonitorBasicDisplayParams) supplements this with the
 /// manufacturer, physical diagonal, and year of manufacture, best-effort matched by friendly name.
 /// Every call is defensive: any failure degrades to "—" and <see cref="Collect"/> never throws.
@@ -16,19 +17,24 @@ public static class DisplayInfoService
 {
     public static List<InfoSection> Collect()
     {
-        var monitors = QueryDisplayConfigMonitors();      // primary: connector type + resolution
-        var wmi = QueryWmiMonitors();                     // supplement: mfr / size / year
+        List<DisplayMonitor> monitors;
+        List<WmiMonitor> wmi;
+
+        // Absolute guarantee: Collect() never throws, whatever DisplayConfig/WMI do.
+        try { monitors = QueryDisplayConfigMonitors(); } catch { monitors = new(); }
+        try { wmi = QueryWmiMonitors(); } catch { wmi = new(); }
 
         var sections = new List<InfoSection>();
 
         if (monitors.Count > 0)
         {
-            var multi = monitors.Count > 1;
+            sections.Add(Summary(monitors.Count));
+
             for (var i = 0; i < monitors.Count; i++)
             {
                 var m = monitors[i];
-                var title = m.FriendlyName is not "—" ? m.FriendlyName : $"Monitor {i + 1}";
-                var s = new InfoSection { Title = multi ? $"{title}  ·  Monitor {i + 1}" : title };
+                var title = m.FriendlyName is not "—" ? m.FriendlyName : $"Display {i + 1}";
+                var s = new InfoSection { Title = title };
 
                 // Best-effort correlate a WMI record by friendly name; else fall back positionally.
                 var match = MatchWmi(wmi, m.FriendlyName, i);
@@ -36,9 +42,14 @@ public static class DisplayInfoService
                 s.Items.Add(new("Name", m.FriendlyName));
                 s.Items.Add(new("Connection", m.Connection));
                 s.Items.Add(new("Resolution", m.Resolution));
+                s.Items.Add(new("Refresh", m.Refresh));
+                s.Items.Add(new("HDR", m.Hdr));
+                s.Items.Add(new("Color depth", m.ColorDepth));
+                s.Items.Add(new("Orientation", m.Orientation));
+                s.Items.Add(new("Primary", m.Primary));
                 s.Items.Add(new("Physical size", match?.Size ?? "—"));
                 s.Items.Add(new("Manufacturer", match?.Manufacturer ?? "—"));
-                s.Items.Add(new("Year", match?.Year ?? "—"));
+                s.Items.Add(new("Year of manufacture", match?.Year ?? "—"));
                 sections.Add(s);
             }
             return sections;
@@ -47,18 +58,24 @@ public static class DisplayInfoService
         // DisplayConfig unavailable — degrade to a WMI-only section per monitor.
         if (wmi.Count > 0)
         {
-            var multi = wmi.Count > 1;
+            sections.Add(Summary(wmi.Count));
+
             for (var i = 0; i < wmi.Count; i++)
             {
                 var w = wmi[i];
-                var title = w.FriendlyName is not "—" ? w.FriendlyName : $"Monitor {i + 1}";
-                var s = new InfoSection { Title = multi ? $"{title}  ·  Monitor {i + 1}" : title };
+                var title = w.FriendlyName is not "—" ? w.FriendlyName : $"Display {i + 1}";
+                var s = new InfoSection { Title = title };
                 s.Items.Add(new("Name", w.FriendlyName));
                 s.Items.Add(new("Connection", "—"));
                 s.Items.Add(new("Resolution", "—"));
+                s.Items.Add(new("Refresh", "—"));
+                s.Items.Add(new("HDR", "—"));
+                s.Items.Add(new("Color depth", "—"));
+                s.Items.Add(new("Orientation", "—"));
+                s.Items.Add(new("Primary", "—"));
                 s.Items.Add(new("Physical size", w.Size));
                 s.Items.Add(new("Manufacturer", w.Manufacturer));
-                s.Items.Add(new("Year", w.Year));
+                s.Items.Add(new("Year of manufacture", w.Year));
                 sections.Add(s);
             }
         }
@@ -66,11 +83,27 @@ public static class DisplayInfoService
         return sections;
     }
 
+    /// <summary>Top-of-list overview card: how many active monitors were found.</summary>
+    private static InfoSection Summary(int count)
+    {
+        var s = new InfoSection { Title = "Displays" };
+        s.Items.Add(new("Active monitors", count.ToString()));
+        return s;
+    }
+
     // =====================================================================================
     //  DisplayConfig (user32.dll) — primary source for connector type + active mode.
     // =====================================================================================
 
-    private sealed record DisplayMonitor(string FriendlyName, string Connection, string Resolution);
+    private sealed record DisplayMonitor(
+        string FriendlyName,
+        string Connection,
+        string Resolution,
+        string Refresh,
+        string Hdr,
+        string ColorDepth,
+        string Orientation,
+        string Primary);
 
     private static List<DisplayMonitor> QueryDisplayConfigMonitors()
     {
@@ -117,8 +150,13 @@ public static class DisplayInfoService
                     connection = OutputTechnology(path.targetInfo.outputTechnology);
                 }
 
-                var resolution = ResolutionFor(path, modes);
-                result.Add(new DisplayMonitor(friendly, connection, resolution));
+                var (resolution, refresh) = ModeFor(path, modes);
+                var (hdr, depth) = AdvancedColorFor(path);
+                var orientation = Orientation(path.targetInfo.rotation);
+                var primary = PrimaryFor(path, modes);
+
+                result.Add(new DisplayMonitor(
+                    friendly, connection, resolution, refresh, hdr, depth, orientation, primary));
             }
         }
         catch { /* DisplayConfig unavailable — caller degrades to WMI-only. */ }
@@ -126,7 +164,8 @@ public static class DisplayInfoService
         return result;
     }
 
-    private static string ResolutionFor(DISPLAYCONFIG_PATH_INFO path, DISPLAYCONFIG_MODE_INFO[] modes)
+    /// <summary>Active resolution and refresh rate for a path's target mode, each best-effort.</summary>
+    private static (string Resolution, string Refresh) ModeFor(DISPLAYCONFIG_PATH_INFO path, DISPLAYCONFIG_MODE_INFO[] modes)
     {
         try
         {
@@ -136,11 +175,68 @@ public static class DisplayInfoService
                 var sig = modes[idx].targetMode.targetVideoSignalInfo;
                 var w = sig.activeSize.cx;
                 var h = sig.activeSize.cy;
-                if (w > 0 && h > 0)
+                var resolution = w > 0 && h > 0 ? $"{w} x {h}" : "—";
+                var hz = RefreshHz(sig.vSyncFreq);
+                var refresh = hz > 0 ? $"{hz} Hz" : "—";
+                return (resolution, refresh);
+            }
+            return ("—", "—");
+        }
+        catch { return ("—", "—"); }
+    }
+
+    /// <summary>
+    /// HDR state and colour depth via DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO (header type = 9).
+    /// The <c>value</c> field is a bitfield: bit0 advancedColorSupported, bit1 advancedColorEnabled,
+    /// bit2 wideColorEnforced, bit3 advancedColorForceDisabled.
+    /// </summary>
+    private static (string Hdr, string ColorDepth) AdvancedColorFor(DISPLAYCONFIG_PATH_INFO path)
+    {
+        try
+        {
+            var info = new DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO
+            {
+                header = new DISPLAYCONFIG_DEVICE_INFO_HEADER
                 {
-                    var hz = RefreshHz(sig.vSyncFreq);
-                    return hz > 0 ? $"{w} x {h} @ {hz} Hz" : $"{w} x {h}";
-                }
+                    type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO,
+                    size = (uint)Marshal.SizeOf<DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO>(),
+                    adapterId = path.targetInfo.adapterId,
+                    id = path.targetInfo.id,
+                },
+            };
+
+            if (DisplayConfigGetDeviceInfo(ref info) != ERROR_SUCCESS)
+                return ("—", "—");
+
+            var supported = (info.value & 0x1) != 0;
+            var enabled = (info.value & 0x2) != 0;
+
+            var hdr = enabled ? "On" : supported ? "Supported (off)" : "Not supported";
+
+            var depth = "—";
+            if (info.bitsPerColorChannel > 0)
+            {
+                depth = $"{info.bitsPerColorChannel}-bit";
+                var enc = ColorEncoding(info.colorEncoding);
+                if (enc is not null)
+                    depth = $"{depth}  ({enc})";
+            }
+
+            return (hdr, depth);
+        }
+        catch { return ("—", "—"); }
+    }
+
+    /// <summary>A path is primary when its source desktop position is at the origin (0,0).</summary>
+    private static string PrimaryFor(DISPLAYCONFIG_PATH_INFO path, DISPLAYCONFIG_MODE_INFO[] modes)
+    {
+        try
+        {
+            var idx = path.sourceInfo.modeInfoIdx;
+            if (idx < modes.Length && modes[idx].infoType == DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)
+            {
+                var pos = modes[idx].sourceMode.position;
+                return pos.x == 0 && pos.y == 0 ? "Yes" : "No";
             }
             return "—";
         }
@@ -152,6 +248,26 @@ public static class DisplayInfoService
         if (r.Denominator == 0) return 0;
         return (int)Math.Round((double)r.Numerator / r.Denominator);
     }
+
+    private static string Orientation(uint rotation) => rotation switch
+    {
+        1 => "Landscape",
+        2 => "Portrait (90°)",
+        3 => "Landscape (flipped 180°)",
+        4 => "Portrait (270°)",
+        _ => "—",
+    };
+
+    /// <summary>Decodes DISPLAYCONFIG_COLOR_ENCODING; null when not worth surfacing.</summary>
+    private static string? ColorEncoding(int encoding) => encoding switch
+    {
+        0 => "RGB",
+        1 => "YCbCr444",
+        2 => "YCbCr422",
+        3 => "YCbCr420",
+        4 => "Intensity",
+        _ => null,
+    };
 
     private static string OutputTechnology(uint tech) => unchecked((int)tech) switch
     {
@@ -278,6 +394,8 @@ public static class DisplayInfoService
     private const int ERROR_SUCCESS = 0;
     private const uint QDC_ONLY_ACTIVE_PATHS = 2;
     private const uint DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME = 2;
+    private const uint DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO = 9;
+    private const uint DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE = 1;
     private const uint DISPLAYCONFIG_MODE_INFO_TYPE_TARGET = 2;
 
     [DllImport("user32.dll")]
@@ -295,6 +413,9 @@ public static class DisplayInfoService
 
     [DllImport("user32.dll")]
     private static extern int DisplayConfigGetDeviceInfo(ref DISPLAYCONFIG_TARGET_DEVICE_NAME requestPacket);
+
+    [DllImport("user32.dll")]
+    private static extern int DisplayConfigGetDeviceInfo(ref DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO requestPacket);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct LUID
@@ -315,6 +436,13 @@ public static class DisplayInfoService
     {
         public uint cx;
         public uint cy;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINTL
+    {
+        public int x;
+        public int y;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -367,9 +495,19 @@ public static class DisplayInfoService
         public DISPLAYCONFIG_VIDEO_SIGNAL_INFO targetVideoSignalInfo;
     }
 
+    // Source mode: a 2D pixel region plus a pixel format, then the desktop-space top-left position.
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DISPLAYCONFIG_SOURCE_MODE
+    {
+        public uint width;
+        public uint height;
+        public uint pixelFormat;
+        public POINTL position;
+    }
+
     // The native DISPLAYCONFIG_MODE_INFO is: header (infoType,id,adapterId) then an 8-byte-aligned
     // union of target/source/desktopImage modes. Header occupies 16 bytes, so the union starts at
-    // offset 16. We only need the target mode, so we overlay just that field.
+    // offset 16. We overlay the target and source mode fields (the two we read) at that offset.
     [StructLayout(LayoutKind.Explicit)]
     private struct DISPLAYCONFIG_MODE_INFO
     {
@@ -377,6 +515,7 @@ public static class DisplayInfoService
         [FieldOffset(4)] public uint id;
         [FieldOffset(8)] public LUID adapterId;
         [FieldOffset(16)] public DISPLAYCONFIG_TARGET_MODE targetMode;
+        [FieldOffset(16)] public DISPLAYCONFIG_SOURCE_MODE sourceMode;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -401,5 +540,16 @@ public static class DisplayInfoService
         public string monitorFriendlyDeviceName;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
         public string monitorDevicePath;
+    }
+
+    // Advanced-colour (HDR / wide-gamut) query. value is a bitfield (see AdvancedColorFor);
+    // colorEncoding is DISPLAYCONFIG_COLOR_ENCODING; bitsPerColorChannel is the active bit depth.
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO
+    {
+        public DISPLAYCONFIG_DEVICE_INFO_HEADER header;
+        public uint value;
+        public int colorEncoding;
+        public uint bitsPerColorChannel;
     }
 }
