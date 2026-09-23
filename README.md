@@ -6,7 +6,7 @@ affinity, I/O priority, memory priority, efficiency mode / EcoQoS, CPU sets, pri
 preference and GPU scheduling priority), watch a live process table, and keep it all in an
 importable/exportable config.
 
-**Version:** 0.1.0 • **Platform:** Windows 10/11 x64 • **Runtime:** .NET 8 (Desktop)
+**Version:** 0.2.0 • **Platform:** Windows 10/11 x64 • **Runtime:** .NET 8 (Desktop)
 
 ---
 
@@ -14,7 +14,9 @@ importable/exportable config.
 
 Process Booster is built in layers, each verified before the next. The **core engine is complete
 and covered by a passing test suite** (46 tests, including real self-process integration tests that
-prove every native call works). The **desktop GUI is the next milestone**.
+prove every native call works), and the **Fluent desktop GUI is built** on top of it — a modern
+WPF app (WPF-UI, Mica, dark theme) with a live process table, a full rule editor, and an activity
+log. Auto-start-at-logon is the next milestone.
 
 | Capability | Layer | State |
 |---|---|---|
@@ -31,8 +33,8 @@ prove every native call works). The **desktop GUI is the next milestone**.
 | Rules engine (persistent, idempotent) | Core | ✅ |
 | Config save / load / import / export | Core | ✅ |
 | Logging (ring buffer + file) | Core | ✅ |
-| **WinForms GUI** (table, editors, log view) | App | 🚧 next |
-| Auto-start service / tray | App | 🚧 planned |
+| **Fluent GUI** (live table, rule editor, log) | App | ✅ implemented |
+| Auto-start at logon / tray | App | 🚧 planned |
 
 ---
 
@@ -46,7 +48,7 @@ ProcessBooster.Core   class library — all logic, no UI. Independently testable
                       CpuTopology (P/E cores), GpuPreferenceStore, RuleMatcher, RuleEngine
   Config/             ConfigStore (JSON, versioned schema, import/export)
   Logging/            ActionLog (thread-safe ring + file sink)
-ProcessBooster.App    WinForms desktop app (next milestone)
+ProcessBooster.App    WPF desktop app (Fluent / WPF-UI, MVVM)
 ProcessBooster.Tests  xUnit — pure-logic + real self-process integration tests
 ```
 
@@ -66,6 +68,18 @@ Requires the .NET 8 SDK on Windows.
 dotnet build  -c Release
 dotnet test   -c Release      # 46 tests; includes live self-process interop checks
 ```
+
+## Run
+
+Publish a runnable copy (framework-dependent; needs the .NET 8 Desktop runtime):
+
+```powershell
+dotnet publish src/ProcessBooster.App -c Release -o publish
+publish\ProcessBooster.exe        # launches the GUI (prompts for admin)
+```
+
+The app requires administrator rights (to change other processes' settings) and will show a UAC
+prompt on launch.
 
 ---
 

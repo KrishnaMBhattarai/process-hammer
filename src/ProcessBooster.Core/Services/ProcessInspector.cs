@@ -94,11 +94,16 @@ public sealed class ProcessInspector
 
     private static bool? ReadEfficiency(Microsoft.Win32.SafeHandles.SafeProcessHandle h)
     {
-        var state = new NativeMethods.PROCESS_POWER_THROTTLING_STATE();
+        // Version must be initialized on input — the API reads it to interpret the buffer.
+        var state = new NativeMethods.PROCESS_POWER_THROTTLING_STATE
+        {
+            Version = NativeMethods.PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+        };
         var size = Marshal.SizeOf(state);
         var ptr = Marshal.AllocHGlobal(size);
         try
         {
+            Marshal.StructureToPtr(state, ptr, false);
             if (!NativeMethods.GetProcessInformation(h, NativeMethods.ProcessPowerThrottling, ptr, (uint)size)) return null;
             state = Marshal.PtrToStructure<NativeMethods.PROCESS_POWER_THROTTLING_STATE>(ptr);
             if ((state.ControlMask & NativeMethods.PROCESS_POWER_THROTTLING_EXECUTION_SPEED) == 0)

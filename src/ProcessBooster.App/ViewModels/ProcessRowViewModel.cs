@@ -1,0 +1,62 @@
+using ProcessBooster.Core.Models;
+using ProcessBooster.Core.Util;
+
+namespace ProcessBooster.App.ViewModels;
+
+/// <summary>One row in the live process table. Updated in place so selection/scroll survive refreshes.</summary>
+public sealed class ProcessRowViewModel : ViewModelBase
+{
+    public int Pid { get; }
+
+    private string _name = "";
+    private string? _exePath;
+    private string _cpu = "";
+    private string _affinity = "";
+    private string _io = "";
+    private string _memory = "";
+    private string _eco = "";
+    private string _workingSet = "";
+    private int _threads;
+    private string? _rule;
+
+    public ProcessRowViewModel(ProcessSnapshot s)
+    {
+        Pid = s.Pid;
+        Update(s);
+    }
+
+    public string Name { get => _name; private set => SetField(ref _name, value); }
+    public string? ExePath { get => _exePath; private set => SetField(ref _exePath, value); }
+    public string Cpu { get => _cpu; private set => SetField(ref _cpu, value); }
+    public string Affinity { get => _affinity; private set => SetField(ref _affinity, value); }
+    public string Io { get => _io; private set => SetField(ref _io, value); }
+    public string Memory { get => _memory; private set => SetField(ref _memory, value); }
+    public string Eco { get => _eco; private set => SetField(ref _eco, value); }
+    public string WorkingSet { get => _workingSet; private set => SetField(ref _workingSet, value); }
+    public int Threads { get => _threads; private set => SetField(ref _threads, value); }
+    public string? Rule { get => _rule; set => SetField(ref _rule, value); }
+    public bool HasRule => !string.IsNullOrEmpty(_rule);
+
+    public void Update(ProcessSnapshot s)
+    {
+        Name = s.Name;
+        ExePath = s.ExePath;
+        Cpu = s.CpuPriority?.ToString() ?? "—";
+        Affinity = s.AffinityMask is { } m && m != 0 ? AffinityMask.ToRangeString(m) : "all";
+        Io = s.IoPriority?.ToString() ?? "—";
+        Memory = s.MemoryPriority?.ToString() ?? "—";
+        Eco = s.EfficiencyMode == true ? "On" : "—";
+        WorkingSet = FormatBytes(s.WorkingSetBytes);
+        Threads = s.ThreadCount;
+        Rule = s.GovernedByRule;
+        Raise(nameof(HasRule));
+    }
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        >= 1L << 30 => $"{bytes / (double)(1L << 30):0.0} GB",
+        >= 1L << 20 => $"{bytes / (double)(1L << 20):0} MB",
+        >= 1L << 10 => $"{bytes / (double)(1L << 10):0} KB",
+        _ => $"{bytes} B",
+    };
+}
