@@ -26,10 +26,14 @@ public sealed class ProcessInspector
 
     public ProcessSnapshot Read(Process p)
     {
-        long ws = 0; int threads = 0; string? path = null;
+        // Working set, thread count and CPU time all come from the single bulk system query that
+        // Process.GetProcesses() already made — no per-process syscall. We deliberately do NOT read
+        // the exe path here (Process.MainModule enumerates modules and is very slow); it's fetched
+        // on demand for the selected row via ReadExePath.
+        long ws = 0; int threads = 0; var cpu = TimeSpan.Zero;
         try { ws = p.WorkingSet64; } catch { }
         try { threads = p.Threads.Count; } catch { }
-        try { path = p.MainModule?.FileName; } catch { /* cross-bitness / protected */ }
+        try { cpu = p.TotalProcessorTime; } catch { }
 
         CpuPriority? prio = null; ulong? affinity = null; int coreCount = 0;
         IoPriority? io = null; MemoryPriority? mem = null; bool? eco = null; bool? boost = null;
@@ -60,7 +64,7 @@ public sealed class ProcessInspector
         {
             Pid = p.Id,
             Name = SafeName(p),
-            ExePath = path,
+            ExePath = null,
             CpuPriority = prio,
             AffinityMask = affinity,
             AffinityCoreCount = coreCount,
@@ -70,7 +74,18 @@ public sealed class ProcessInspector
             PriorityBoostEnabled = boost,
             WorkingSetBytes = ws,
             ThreadCount = threads,
+            CpuTime = cpu,
         };
+    }
+
+    /// <summary>Full image path for one process (fast; used for the selected row only).</summary>
+    public string? ReadExePath(int pid)
+    {
+        using var h = NativeMethods.OpenProcess(NativeMethods.ACCESS_READ, false, pid);
+        if (h.IsInvalid) return null;
+        uint cap = 1024;
+        var sb = new System.Text.StringBuilder((int)cap);
+        return NativeMethods.QueryFullProcessImageName(h, 0, sb, ref cap) ? sb.ToString() : null;
     }
 
     private static string SafeName(Process p)

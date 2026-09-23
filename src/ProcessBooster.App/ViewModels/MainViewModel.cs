@@ -22,6 +22,10 @@ public sealed class MainViewModel : ViewModelBase
     private readonly RuleEngine _engine;
     private readonly ActionLog _log;
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
+    private readonly Dictionary<int, TimeSpan> _prevCpu = new();
+    private readonly int _cpuCount = Math.Max(1, Environment.ProcessorCount);
+    private DateTime _lastTick = DateTime.UtcNow;
+    private bool _refreshing;
 
     public ObservableCollection<ProcessRowViewModel> Processes { get; } = new();
     public ICollectionView ProcessView { get; }
@@ -34,6 +38,8 @@ public sealed class MainViewModel : ViewModelBase
     public RelayCommand ImportCommand { get; }
     public RelayCommand ExportCommand { get; }
     public RelayCommand RefreshCommand { get; }
+    public RelayCommand QuickPriorityCommand { get; }
+    public RelayCommand QuickEfficiencyCommand { get; }
 
     public MainViewModel(AppConfig config, ConfigStore store, ProcessInspector inspector,
         ProcessController controller, CpuTopology topology, RuleEngine engine, ActionLog log)
@@ -53,6 +59,8 @@ public sealed class MainViewModel : ViewModelBase
         ImportCommand = new RelayCommand(_ => ImportConfig());
         ExportCommand = new RelayCommand(_ => ExportConfig());
         RefreshCommand = new RelayCommand(_ => Refresh());
+        QuickPriorityCommand = new RelayCommand(QuickPriority, _ => SelectedProcess is not null);
+        QuickEfficiencyCommand = new RelayCommand(QuickEfficiency, _ => SelectedProcess is not null);
 
         _log.Logged += OnLogged;
         _timer.Tick += (_, _) => Refresh();
@@ -78,8 +86,22 @@ public sealed class MainViewModel : ViewModelBase
             if (value is null) Editor.Clear();
             else
             {
-                Editor.SetTarget(value.Name, value.Pid, value.ExePath);
-                Editor.LoadFrom(FindRule(value.Name));
+                var pid = value.Pid; var name = value.Name;
+                Editor.SetTarget(name, pid, value.ExePath);
+                Editor.LoadFrom(FindRule(name));
+
+                // Resolve the exe path lazily off-thread (needed for GPU preference) so selection is instant.
+                if (value.ExePath is null)
+                {
+                    Task.Run(() => _inspector.ReadExePath(pid)).ContinueWith(t =>
+                    {
+                        if (t.Result is { } path && SelectedProcess?.Pid == pid)
+                        {
+                            value.ExePath = path;
+                            Editor.SetTarget(name, pid, path);
+                        }
+                    }, TaskScheduler.FromCurrentSynchronizationContext());
+                }
             }
             RaiseCommands();
         }
@@ -120,27 +142,49 @@ public sealed class MainViewModel : ViewModelBase
         $"{ProcessCount} processes  ·  {RuleCount} rule(s)  ·  engine {(EngineRunning ? "running" : "paused")}  ·  {(IsAdmin ? "admin" : "NOT admin")}";
 
     // ---- core operations ----
-    public void Refresh()
+    public async void Refresh()
     {
-        var snaps = _inspector.Snapshot();
-        var existing = Processes.ToDictionary(r => r.Pid);
-        var seen = new HashSet<int>();
-
-        foreach (var s in snaps)
+        if (_refreshing) return;      // never overlap scans
+        _refreshing = true;
+        try
         {
-            s.GovernedByRule = RuleMatcher.FirstMatch(_config.Rules, s.Name)?.Match;
-            seen.Add(s.Pid);
-            if (existing.TryGetValue(s.Pid, out var row)) row.Update(s);
-            else Processes.Add(new ProcessRowViewModel(s));
+            var now = DateTime.UtcNow;
+            var elapsed = Math.Max(0.001, (now - _lastTick).TotalSeconds);
+            _lastTick = now;
+
+            // Heavy work (process enumeration + per-process native reads) OFF the UI thread,
+            // so scrolling, selection and the whole window stay responsive.
+            var snaps = await Task.Run(() => _inspector.Snapshot()).ConfigureAwait(true);
+
+            var existing = Processes.ToDictionary(r => r.Pid);
+            var seen = new HashSet<int>();
+
+            foreach (var s in snaps)
+            {
+                s.GovernedByRule = RuleMatcher.FirstMatch(_config.Rules, s.Name)?.Match;
+                seen.Add(s.Pid);
+
+                double cpu = 0;
+                if (_prevCpu.TryGetValue(s.Pid, out var prev))
+                    cpu = Math.Clamp((s.CpuTime - prev).TotalSeconds / elapsed / _cpuCount * 100.0, 0, 100);
+                _prevCpu[s.Pid] = s.CpuTime;
+
+                if (existing.TryGetValue(s.Pid, out var row)) row.Update(s, cpu);
+                else Processes.Add(new ProcessRowViewModel(s, cpu));
+            }
+
+            for (var i = Processes.Count - 1; i >= 0; i--)
+                if (!seen.Contains(Processes[i].Pid))
+                    Processes.RemoveAt(i);
+
+            foreach (var pid in _prevCpu.Keys.Where(k => !seen.Contains(k)).ToList())
+                _prevCpu.Remove(pid);
+
+            ProcessCount = Processes.Count;
+            Raise(nameof(RuleCount));
+            Raise(nameof(StatusText));
         }
-
-        for (var i = Processes.Count - 1; i >= 0; i--)
-            if (!seen.Contains(Processes[i].Pid))
-                Processes.RemoveAt(i);
-
-        ProcessCount = Processes.Count;
-        Raise(nameof(RuleCount));
-        Raise(nameof(StatusText));
+        finally { _refreshing = false; }
     }
 
     private void ApplyNow()
@@ -150,6 +194,20 @@ public sealed class MainViewModel : ViewModelBase
         if (rule is null) { _log.Warn($"{p.Name}: nothing to apply (no settings chosen)."); return; }
         var results = _controller.ApplyRule(rule, p.Pid, p.ExePath);
         foreach (var r in results) _log.Action($"{p.Name} (pid {p.Pid}) {r}");
+    }
+
+    // Right-click quick actions — apply immediately to the selected process (one-shot, no rule saved).
+    private void QuickPriority(object? param)
+    {
+        if (SelectedProcess is not { } p || param is not CpuPriority prio) return;
+        _log.Action($"{p.Name} (pid {p.Pid}) {_controller.SetCpuPriority(p.Pid, prio)}");
+    }
+
+    private void QuickEfficiency(object? param)
+    {
+        if (SelectedProcess is not { } p) return;
+        var on = param is bool b ? b : string.Equals(param?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+        _log.Action($"{p.Name} (pid {p.Pid}) {_controller.SetEfficiencyMode(p.Pid, on)}");
     }
 
     private void SaveRule()
@@ -231,6 +289,8 @@ public sealed class MainViewModel : ViewModelBase
         ApplyNowCommand.RaiseCanExecuteChanged();
         SaveRuleCommand.RaiseCanExecuteChanged();
         RemoveRuleCommand.RaiseCanExecuteChanged();
+        QuickPriorityCommand.RaiseCanExecuteChanged();
+        QuickEfficiencyCommand.RaiseCanExecuteChanged();
     }
 
     private void OnLogged(LogEntry entry)

@@ -21,6 +21,9 @@ public sealed class ProcessSnapshot
     public long WorkingSetBytes { get; init; }
     public int ThreadCount { get; init; }
 
+    /// <summary>Total CPU time consumed so far; the UI derives live CPU % from deltas between refreshes.</summary>
+    public TimeSpan CpuTime { get; init; }
+
     /// <summary>Name of the rule currently governing this process, if any (set by the engine).</summary>
     public string? GovernedByRule { get; set; }
 }

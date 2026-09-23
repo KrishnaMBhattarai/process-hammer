@@ -55,6 +55,11 @@ internal static class NativeMethods
     [DllImport("kernel32.dll", SetLastError = true)]
     internal static extern SafeProcessHandle OpenProcess(uint desiredAccess, bool inheritHandle, int processId);
 
+    // Fast full-image-path lookup (no module enumeration, unlike Process.MainModule).
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    internal static extern bool QueryFullProcessImageName(
+        SafeProcessHandle handle, uint flags, System.Text.StringBuilder exeName, ref uint size);
+
     [DllImport("kernel32.dll", SetLastError = true)]
     internal static extern bool SetPriorityClass(SafeProcessHandle handle, uint priorityClass);
 

@@ -18,15 +18,19 @@ public sealed class ProcessRowViewModel : ViewModelBase
     private string _workingSet = "";
     private int _threads;
     private string? _rule;
+    private double _cpuPercent;
 
-    public ProcessRowViewModel(ProcessSnapshot s)
+    public ProcessRowViewModel(ProcessSnapshot s, double cpuPercent = 0)
     {
         Pid = s.Pid;
-        Update(s);
+        Update(s, cpuPercent);
     }
 
+    /// <summary>Live CPU usage as a percentage of one core-second (0–100 across all cores).</summary>
+    public double CpuPercent { get => _cpuPercent; private set => SetField(ref _cpuPercent, value); }
+
     public string Name { get => _name; private set => SetField(ref _name, value); }
-    public string? ExePath { get => _exePath; private set => SetField(ref _exePath, value); }
+    public string? ExePath { get => _exePath; set => SetField(ref _exePath, value); }
     public string Cpu { get => _cpu; private set => SetField(ref _cpu, value); }
     public string Affinity { get => _affinity; private set => SetField(ref _affinity, value); }
     public string Io { get => _io; private set => SetField(ref _io, value); }
@@ -37,10 +41,11 @@ public sealed class ProcessRowViewModel : ViewModelBase
     public string? Rule { get => _rule; set => SetField(ref _rule, value); }
     public bool HasRule => !string.IsNullOrEmpty(_rule);
 
-    public void Update(ProcessSnapshot s)
+    public void Update(ProcessSnapshot s, double cpuPercent)
     {
         Name = s.Name;
-        ExePath = s.ExePath;
+        CpuPercent = cpuPercent;
+        if (s.ExePath is not null) ExePath = s.ExePath; // keep a path we resolved earlier
         Cpu = s.CpuPriority?.ToString() ?? "—";
         Affinity = s.AffinityMask is { } m && m != 0 ? AffinityMask.ToRangeString(m) : "all";
         Io = s.IoPriority?.ToString() ?? "—";
