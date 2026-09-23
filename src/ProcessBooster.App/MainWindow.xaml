@@ -373,6 +373,14 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
+            <TabItem Content="{Binding UsersTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="People24" Style="{StaticResource TabIcon}" />
+                        <TextBlock Text="Users" Style="{StaticResource TabHeaderText}" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
             <TabItem Content="{Binding CpuTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
