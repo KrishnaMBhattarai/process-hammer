@@ -15,3 +15,6 @@ processbooster.config.local.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Built distributables live in GitHub Releases, not the repo
+dist/
