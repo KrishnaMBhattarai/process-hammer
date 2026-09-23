@@ -33,7 +33,7 @@ public sealed class MainViewModel : ViewModelBase
     public ObservableCollection<string> LogLines { get; } = new();
     public RuleEditorViewModel Editor { get; }
     private readonly LiveMonitor _monitor;
-    private readonly HardwareTabViewModel?[] _tabByIndex;
+    private readonly ITab?[] _tabByIndex;
 
     public HardwareTabViewModel SystemTab { get; }
     public HardwareTabViewModel OsTab { get; }
@@ -43,6 +43,9 @@ public sealed class MainViewModel : ViewModelBase
     public HardwareTabViewModel DisplayTab { get; }
     public HardwareTabViewModel StorageTab { get; }
     public HardwareTabViewModel NetworkTab { get; }
+    public HardwareTabViewModel SecurityTab { get; }
+    public HardwareTabViewModel PowerTab { get; }
+    public SensorsTabViewModel SensorsTab { get; }
 
     public RelayCommand ApplyNowCommand { get; }
     public RelayCommand SaveRuleCommand { get; }
@@ -52,6 +55,8 @@ public sealed class MainViewModel : ViewModelBase
     public RelayCommand RefreshCommand { get; }
     public RelayCommand QuickPriorityCommand { get; }
     public RelayCommand QuickEfficiencyCommand { get; }
+    public RelayCommand CopySpecsCommand { get; }
+    public RelayCommand ExportReportCommand { get; }
 
     public MainViewModel(AppConfig config, ConfigStore store, ProcessInspector inspector,
         ProcessController controller, CpuTopology topology, RuleEngine engine, ActionLog log, LiveMonitor monitor)
@@ -86,13 +91,19 @@ public sealed class MainViewModel : ViewModelBase
 
         CpuTab = new HardwareTabViewModel(
             () => { var l = CpuInfoService.Collect(); l.AddRange(CpuCoreSections(topology)); return l; },
-            monitor, Cpu(), note);
+            monitor, Cpu(), note,
+            new[]
+            {
+                new SparklineViewModel("CPU load", m => m.Sensors.CpuLoad, "%"),
+                new SparklineViewModel("CPU temperature", m => m.Sensors.CpuTempC, "°C"),
+            });
 
         MemoryTab = new HardwareTabViewModel(MemoryInfoService.Collect, monitor, new[]
         {
             ("Used", (Func<LiveMonitor, string>)(m => Live.Gb(m.Sensors.MemUsedGb))),
             ("Load", m => Live.Fmt(m.Sensors.MemLoad, "%")),
-        }, note);
+        }, note,
+        new[] { new SparklineViewModel("Memory usage", m => m.Sensors.MemLoad, "%") });
 
         GraphicsTab = new HardwareTabViewModel(GraphicsInfoService.Collect, monitor, new[]
         {
@@ -100,7 +111,12 @@ public sealed class MainViewModel : ViewModelBase
             ("GPU load", m => Live.Fmt(m.Sensors.GpuLoad, "%")),
             ("GPU clock", m => Live.Mhz(m.Sensors.GpuClockMhz)),
             ("GPU memory", m => Live.Vram(m.Sensors.GpuVramUsedGb, m.Sensors.GpuVramTotalGb)),
-        }, note);
+        }, note,
+        new[]
+        {
+            new SparklineViewModel("GPU load", m => m.Sensors.GpuLoad, "%"),
+            new SparklineViewModel("GPU temperature", m => m.Sensors.GpuTempC, "°C"),
+        });
 
         DisplayTab = new HardwareTabViewModel(DisplayInfoService.Collect);
         StorageTab = new HardwareTabViewModel(StorageInfoService.Collect);
@@ -109,12 +125,24 @@ public sealed class MainViewModel : ViewModelBase
         {
             ("Download", (Func<LiveMonitor, string>)(m => Live.Mbps(m.NetDownMbps))),
             ("Upload", m => Live.Mbps(m.NetUpMbps)),
-        }, note);
+        }, note,
+        new[]
+        {
+            new SparklineViewModel("Download", m => m.NetDownMbps, " Mbps"),
+            new SparklineViewModel("Upload", m => m.NetUpMbps, " Mbps"),
+        });
 
         OsTab = new HardwareTabViewModel(OsInfoService.Collect);
+        SecurityTab = new HardwareTabViewModel(SecurityInfoService.Collect);
+        PowerTab = new HardwareTabViewModel(PowerInfoService.Collect);
+        SensorsTab = new SensorsTabViewModel(monitor, note);
 
-        // Index 0 = Processes (no hardware VM); 1..8 map to the hardware tabs, in the same order as the XAML.
-        _tabByIndex = new[] { null, SystemTab, OsTab, CpuTab, MemoryTab, GraphicsTab, DisplayTab, StorageTab, NetworkTab };
+        // Index 0 = Processes (no hardware VM); 1..11 map to the hardware tabs, same order as the XAML.
+        _tabByIndex = new ITab?[]
+        {
+            null, SystemTab, OsTab, SecurityTab, CpuTab, MemoryTab, GraphicsTab,
+            DisplayTab, StorageTab, NetworkTab, SensorsTab, PowerTab,
+        };
 
         ProcessView = CollectionViewSource.GetDefaultView(Processes);
         ProcessView.Filter = FilterProcess;
@@ -128,6 +156,8 @@ public sealed class MainViewModel : ViewModelBase
         RefreshCommand = new RelayCommand(_ => Refresh());
         QuickPriorityCommand = new RelayCommand(QuickPriority, _ => SelectedProcess is not null);
         QuickEfficiencyCommand = new RelayCommand(QuickEfficiency, _ => SelectedProcess is not null);
+        CopySpecsCommand = new RelayCommand(_ => CopySpecs());
+        ExportReportCommand = new RelayCommand(_ => ExportReport());
 
         _log.Logged += OnLogged;
         _timer.Tick += (_, _) => Refresh();
@@ -377,6 +407,30 @@ public sealed class MainViewModel : ViewModelBase
         if (dlg.ShowDialog() != true) return;
         try { ConfigStore.Export(_config, dlg.FileName); _log.Info($"Exported config to {Path.GetFileName(dlg.FileName)}."); }
         catch (Exception ex) { _log.Error($"Export failed: {ex.Message}"); }
+    }
+
+    private async void CopySpecs()
+    {
+        try
+        {
+            var text = await Task.Run(Hardware.ReportBuilder.Build);
+            System.Windows.Clipboard.SetText(text);
+            _log.Info("Copied full system report to clipboard.");
+        }
+        catch (Exception ex) { _log.Error("Copy specs failed: " + ex.Message); }
+    }
+
+    private async void ExportReport()
+    {
+        var dlg = new SaveFileDialog { Filter = "Text report (*.txt)|*.txt", Title = "Export system report", FileName = "process-booster-report.txt" };
+        if (dlg.ShowDialog() != true) return;
+        try
+        {
+            var text = await Task.Run(Hardware.ReportBuilder.Build);
+            File.WriteAllText(dlg.FileName, text);
+            _log.Info("Exported system report to " + Path.GetFileName(dlg.FileName));
+        }
+        catch (Exception ex) { _log.Error("Export report failed: " + ex.Message); }
     }
 
     // ---- helpers ----

@@ -5,7 +5,7 @@
                  xmlns:core="clr-namespace:ProcessBooster.Core.Models;assembly=ProcessBooster.Core"
                  xmlns:vm="clr-namespace:ProcessBooster.App.ViewModels"
                  Title="Process Booster"
-                 Width="1280" Height="820" MinWidth="1000" MinHeight="640"
+                 Width="1400" Height="840" MinWidth="1120" MinHeight="640"
                  WindowStartupLocation="CenterScreen"
                  WindowBackdropType="Mica"
                  ExtendsContentIntoTitleBar="True">
@@ -67,6 +67,28 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
+                    <ItemsControl ItemsSource="{Binding Graphs}" Margin="0,0,0,6">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <ui:Card Margin="4,4,4,10" Padding="14,10">
+                                    <StackPanel>
+                                        <DockPanel Width="300">
+                                            <TextBlock Text="{Binding Title}" Opacity="0.7" FontSize="12" />
+                                            <TextBlock Text="{Binding Current}" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                        </DockPanel>
+                                        <Border Width="300" Height="46" Margin="0,6,0,0" ClipToBounds="True">
+                                            <Polyline Points="{Binding Points}" Stroke="{StaticResource AccentPurple}"
+                                                      StrokeThickness="2" StrokeLineJoin="Round" />
+                                        </Border>
+                                    </StackPanel>
+                                </ui:Card>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
                     <ItemsControl ItemsSource="{Binding Sections}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
@@ -86,6 +108,52 @@
                                                         </Grid.ColumnDefinitions>
                                                         <TextBlock Grid.Column="0" Text="{Binding Label}" Opacity="0.6" TextWrapping="Wrap" />
                                                         <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </ui:Card>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </DataTemplate>
+
+        <!-- Sensors tab: live per-device sensor dump -->
+        <DataTemplate DataType="{x:Type vm:SensorsTabViewModel}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8,12,8,8">
+                <StackPanel>
+                    <TextBlock Text="{Binding Note}" Foreground="#F0B400" TextWrapping="Wrap" Margin="4,0,4,12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed" /></Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <ItemsControl ItemsSource="{Binding Groups}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <ui:Card Width="380" Margin="4,4,4,12" Padding="16" VerticalAlignment="Top">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                                   Margin="0,0,0,8" TextTrimming="CharacterEllipsis" />
+                                        <ItemsControl ItemsSource="{Binding Readings}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,2">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{Binding Name}" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Value}" FontWeight="SemiBold" />
                                                     </Grid>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
@@ -292,8 +360,16 @@
             <TabItem Content="{Binding OsTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <ui:SymbolIcon Symbol="DesktopTower24" Style="{StaticResource TabIcon}" />
+                        <ui:SymbolIcon Symbol="Window24" Style="{StaticResource TabIcon}" />
                         <TextBlock Text="OS" Style="{StaticResource TabHeaderText}" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding SecurityTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="ShieldTask24" Style="{StaticResource TabIcon}" />
+                        <TextBlock Text="Security" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
@@ -317,7 +393,7 @@
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Games24" Style="{StaticResource TabIcon}" />
-                        <TextBlock Text="Graphics" Style="{StaticResource TabHeaderText}" />
+                        <TextBlock Text="GPU" Style="{StaticResource TabHeaderText}" />
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
@@ -345,10 +421,32 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
+            <TabItem Content="{Binding SensorsTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Gauge24" Style="{StaticResource TabIcon}" />
+                        <TextBlock Text="Sensors" Style="{StaticResource TabHeaderText}" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding PowerTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="BatteryCharge24" Style="{StaticResource TabIcon}" />
+                        <TextBlock Text="Power" Style="{StaticResource TabHeaderText}" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
         </TabControl>
 
-        <Border Grid.Row="2" Padding="16,8" Background="#16000000">
-            <TextBlock Text="{Binding StatusText}" Opacity="0.85" />
+        <Border Grid.Row="2" Padding="12,6" Background="#16000000">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <ui:Button Content="Copy specs" Command="{Binding CopySpecsCommand}" Margin="0,0,8,0" />
+                    <ui:Button Content="Export report" Command="{Binding ExportReportCommand}" />
+                </StackPanel>
+                <TextBlock Text="{Binding StatusText}" Opacity="0.85" VerticalAlignment="Center" />
+            </DockPanel>
         </Border>
     </Grid>
 </ui:FluentWindow>

@@ -35,7 +35,6 @@ public static class GraphicsInfoService
 
                 s.Items.Add(new("Driver version", Str(g, "DriverVersion")));
                 s.Items.Add(new("Driver date", WmiDate(Str(g, "DriverDate"))));
-                s.Items.Add(new("Display drivers", Str(g, "InstalledDisplayDrivers")));
 
                 var w = Str(g, "CurrentHorizontalResolution");
                 var h = Str(g, "CurrentVerticalResolution");
@@ -45,10 +44,7 @@ public static class GraphicsInfoService
                     ? "—"
                     : $"{w} x {h} @ {hz} Hz  ·  {bpp}-bit";
                 s.Items.Add(new("Current mode", mode));
-                s.Items.Add(new("Mode description", Str(g, "VideoModeDescription")));
-
                 s.Items.Add(new("Status", Str(g, "Status")));
-                s.Items.Add(new("PNP device ID", Str(g, "PNPDeviceID")));
 
                 sections.Add(s);
             }

@@ -7,7 +7,7 @@ namespace ProcessBooster.App.ViewModels;
 /// Generic backing VM for every hardware info tab: static <see cref="Sections"/> collected once
 /// (off the UI thread) plus optional live <see cref="Tiles"/> fed from the shared <see cref="LiveMonitor"/>.
 /// </summary>
-public sealed class HardwareTabViewModel : ViewModelBase, IDisposable
+public sealed class HardwareTabViewModel : ViewModelBase, ITab, IDisposable
 {
     private readonly Func<List<InfoSection>> _collect;
     private readonly LiveMonitor? _monitor;
@@ -15,13 +15,15 @@ public sealed class HardwareTabViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<InfoSection> Sections { get; } = new();
     public ObservableCollection<StatTile> Tiles { get; } = new();
+    public ObservableCollection<SparklineViewModel> Graphs { get; } = new();
     public string? Note { get; }
 
     public HardwareTabViewModel(
         Func<List<InfoSection>> collect,
         LiveMonitor? monitor = null,
         (string Label, Func<LiveMonitor, string> Read)[]? tiles = null,
-        string? note = null)
+        string? note = null,
+        SparklineViewModel[]? graphs = null)
     {
         _collect = collect;
         _monitor = monitor;
@@ -29,6 +31,7 @@ public sealed class HardwareTabViewModel : ViewModelBase, IDisposable
         Note = note;
 
         foreach (var (label, _) in _tileDefs) Tiles.Add(new StatTile(label));
+        if (graphs is not null) foreach (var g in graphs) Graphs.Add(g);
     }
 
     private bool _loaded;
@@ -43,7 +46,7 @@ public sealed class HardwareTabViewModel : ViewModelBase, IDisposable
             var sections = await Task.Run(_collect);   // static specs: pulled ONCE, off the UI thread
             foreach (var s in sections) Sections.Add(s);
         }
-        if (_monitor is not null && _tileDefs.Length > 0 && !_live)
+        if (_monitor is not null && (_tileDefs.Length > 0 || Graphs.Count > 0) && !_live)
         {
             _live = true;
             _monitor.Updated += OnUpdated;
@@ -66,6 +69,7 @@ public sealed class HardwareTabViewModel : ViewModelBase, IDisposable
         if (_monitor is null) return;
         for (var i = 0; i < Tiles.Count && i < _tileDefs.Length; i++)
             Tiles[i].Value = _tileDefs[i].Read(_monitor);
+        foreach (var g in Graphs) g.Push(_monitor);
     }
 
     public void Dispose() => Deactivate();
