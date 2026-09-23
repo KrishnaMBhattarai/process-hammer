@@ -4,7 +4,7 @@
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  xmlns:core="clr-namespace:ProcessBooster.Core.Models;assembly=ProcessBooster.Core"
                  Title="Process Booster"
-                 Width="1240" Height="780" MinWidth="960" MinHeight="600"
+                 Width="1240" Height="800" MinWidth="980" MinHeight="620"
                  WindowStartupLocation="CenterScreen"
                  WindowBackdropType="Mica"
                  ExtendsContentIntoTitleBar="True">
@@ -22,169 +22,234 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Title bar -->
-        <ui:TitleBar Grid.Row="0" Title="Process Booster" Grid.ColumnSpan="2">
+        <ui:TitleBar Grid.Row="0" Title="Process Booster">
             <ui:TitleBar.Icon>
                 <ui:SymbolIcon Symbol="Rocket24" />
             </ui:TitleBar.Icon>
         </ui:TitleBar>
 
-        <!-- Toolbar -->
-        <Grid Grid.Row="1" Margin="16,4,16,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+        <TabControl Grid.Row="1" Margin="12,4,12,6">
 
-            <ui:TextBox Grid.Column="0" MaxWidth="420" HorizontalAlignment="Left"
-                        PlaceholderText="Search processes by name or PID…"
-                        Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
-                <ui:TextBox.Icon>
-                    <ui:SymbolIcon Symbol="Search24" />
-                </ui:TextBox.Icon>
-            </ui:TextBox>
+            <!-- ============================ PROCESSES ============================ -->
+            <TabItem Header="Processes">
+                <Grid Margin="4,8,4,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0"
-                            ToolTip="When on, Process Booster keeps re-applying your saved rules to matching processes (including new instances as they launch). Turn off to pause enforcement.">
-                    <TextBlock Text="Auto-apply rules" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.85" />
-                    <ui:ToggleSwitch IsChecked="{Binding EngineRunning, Mode=TwoWay}" />
-                </StackPanel>
-                <ui:Button Content="Refresh" Command="{Binding RefreshCommand}" Margin="0,0,8,0" />
-                <ui:Button Content="Import" Command="{Binding ImportCommand}" Margin="0,0,8,0" />
-                <ui:Button Content="Export" Appearance="Primary" Command="{Binding ExportCommand}" />
-            </StackPanel>
-        </Grid>
-
-        <!-- Content: process table + right panel -->
-        <Grid Grid.Row="2" Margin="16,0,16,8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="420" />
-            </Grid.ColumnDefinitions>
-
-            <ui:Card Grid.Column="0" Padding="0">
-                <DataGrid ItemsSource="{Binding ProcessView}"
-                          SelectedItem="{Binding SelectedProcess, Mode=TwoWay}"
-                          AutoGenerateColumns="False" IsReadOnly="True"
-                          HeadersVisibility="Column" GridLinesVisibility="None"
-                          CanUserResizeRows="False" CanUserAddRows="False" CanUserSortColumns="True"
-                          SelectionMode="Single" SelectionUnit="FullRow"
-                          Background="Transparent" BorderThickness="0" RowHeight="30"
-                          EnableRowVirtualization="True"
-                          VirtualizingPanel.IsVirtualizing="True"
-                          VirtualizingPanel.VirtualizationMode="Recycling"
-                          ScrollViewer.CanContentScroll="True"
-                          ScrollViewer.VerticalScrollBarVisibility="Auto">
-                    <DataGrid.RowStyle>
-                        <Style TargetType="DataGridRow">
-                            <Setter Property="ToolTip" Value="{Binding ExePath}" />
-                        </Style>
-                    </DataGrid.RowStyle>
-                    <DataGrid.ContextMenu>
-                        <ContextMenu>
-                            <MenuItem Header="Set priority">
-                                <MenuItem Header="Idle" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.Idle}" />
-                                <MenuItem Header="Below normal" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.BelowNormal}" />
-                                <MenuItem Header="Normal" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.Normal}" />
-                                <MenuItem Header="Above normal" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.AboveNormal}" />
-                                <MenuItem Header="High" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.High}" />
-                            </MenuItem>
-                            <Separator />
-                            <MenuItem Header="Efficiency mode: On" Command="{Binding QuickEfficiencyCommand}" CommandParameter="True" />
-                            <MenuItem Header="Efficiency mode: Off" Command="{Binding QuickEfficiencyCommand}" CommandParameter="False" />
-                        </ContextMenu>
-                    </DataGrid.ContextMenu>
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Process" Binding="{Binding Name}" Width="2*" SortMemberPath="Name" />
-                        <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="0.7*" />
-                        <DataGridTextColumn Header="CPU %" Binding="{Binding CpuPercent, StringFormat={}{0:0}}" Width="0.7*" SortMemberPath="CpuPercent" />
-                        <DataGridTextColumn Header="Priority" Binding="{Binding Cpu}" Width="1.1*" />
-                        <DataGridTextColumn Header="Cores" Binding="{Binding Affinity}" Width="0.9*" />
-                        <DataGridTextColumn Header="I/O" Binding="{Binding Io}" Width="0.8*" />
-                        <DataGridTextColumn Header="Memory" Binding="{Binding Memory}" Width="0.9*" />
-                        <DataGridTextColumn Header="Eco" Binding="{Binding Eco}" Width="0.5*" />
-                        <DataGridTextColumn Header="RAM" Binding="{Binding WorkingSet}" Width="0.9*" />
-                        <DataGridTextColumn Header="Rule" Binding="{Binding Rule}" Width="1.1*" />
-                    </DataGrid.Columns>
-                </DataGrid>
-            </ui:Card>
-
-            <!-- Right panel: Rule editor + Activity log -->
-            <ui:Card Grid.Column="2" Padding="0">
-                <TabControl>
-                    <TabItem Header="Rule">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-                            <StackPanel>
-                                <TextBlock Text="{Binding Editor.TargetHeader}" FontSize="18" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding Editor.TargetExePath}" Opacity="0.6" TextTrimming="CharacterEllipsis"
-                                           Margin="0,2,0,14" />
-
-                                <StackPanel IsEnabled="{Binding Editor.HasTarget}">
-                                    <TextBlock Text="CPU priority" Style="{StaticResource FieldLabel}" />
-                                    <ComboBox ItemsSource="{Binding Editor.CpuPriorityOptions}" SelectedItem="{Binding Editor.SelectedCpuPriority, Mode=TwoWay}" />
-
-                                    <TextBlock Text="CPU affinity (e.g. 0-7,16 — blank = all)" Style="{StaticResource FieldLabel}" />
-                                    <ui:TextBox Text="{Binding Editor.AffinityText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="all cores" />
-
-                                    <TextBlock Text="I/O priority" Style="{StaticResource FieldLabel}" />
-                                    <ComboBox ItemsSource="{Binding Editor.IoOptions}" SelectedItem="{Binding Editor.SelectedIo, Mode=TwoWay}" />
-
-                                    <TextBlock Text="Memory priority" Style="{StaticResource FieldLabel}" />
-                                    <ComboBox ItemsSource="{Binding Editor.MemoryOptions}" SelectedItem="{Binding Editor.SelectedMemory, Mode=TwoWay}" />
-
-                                    <TextBlock Text="Efficiency mode (EcoQoS)" Style="{StaticResource FieldLabel}" />
-                                    <ComboBox ItemsSource="{Binding Editor.EfficiencyOptions}" SelectedItem="{Binding Editor.SelectedEfficiency, Mode=TwoWay}" />
-
-                                    <TextBlock Text="Priority boost" Style="{StaticResource FieldLabel}" />
-                                    <ComboBox ItemsSource="{Binding Editor.BoostOptions}" SelectedItem="{Binding Editor.SelectedBoost, Mode=TwoWay}" />
-
-                                    <TextBlock Text="CPU sets" Style="{StaticResource FieldLabel}" />
-                                    <ComboBox ItemsSource="{Binding Editor.CpuSetOptions}" SelectedItem="{Binding Editor.SelectedCpuSet, Mode=TwoWay}" />
-                                    <ui:TextBox Margin="0,6,0,0"
-                                                Text="{Binding Editor.CustomCpuSetText, UpdateSourceTrigger=PropertyChanged}"
-                                                PlaceholderText="custom core list, e.g. 0-7"
-                                                Visibility="{Binding Editor.IsCustomCpuSet, Converter={StaticResource BoolToVis}}" />
-
-                                    <TextBlock Text="GPU preference" Style="{StaticResource FieldLabel}" />
-                                    <ComboBox ItemsSource="{Binding Editor.GpuPreferenceOptions}" SelectedItem="{Binding Editor.SelectedGpuPreference, Mode=TwoWay}" />
-
-                                    <TextBlock Text="GPU scheduling priority" Style="{StaticResource FieldLabel}" />
-                                    <ComboBox ItemsSource="{Binding Editor.GpuSchedulingOptions}" SelectedItem="{Binding Editor.SelectedGpuScheduling, Mode=TwoWay}" />
-
-                                    <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
-                                        <ui:Button Content="Apply now" Appearance="Secondary" Command="{Binding ApplyNowCommand}" Margin="0,0,8,0" />
-                                        <ui:Button Content="Save rule" Appearance="Primary" Command="{Binding SaveRuleCommand}" Margin="0,0,8,0" />
-                                        <ui:Button Content="Remove" Command="{Binding RemoveRuleCommand}" />
-                                    </StackPanel>
-                                </StackPanel>
+                    <!-- toolbar -->
+                    <Grid Grid.Row="0" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ui:TextBox Grid.Column="0" MaxWidth="420" HorizontalAlignment="Left"
+                                    PlaceholderText="Search processes by name or PID…"
+                                    Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
+                            <ui:TextBox.Icon>
+                                <ui:SymbolIcon Symbol="Search24" />
+                            </ui:TextBox.Icon>
+                        </ui:TextBox>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0"
+                                        ToolTip="When on, Process Booster keeps re-applying your saved rules to matching processes (including new instances as they launch). Turn off to pause enforcement.">
+                                <TextBlock Text="Auto-apply rules" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.85" />
+                                <ui:ToggleSwitch IsChecked="{Binding EngineRunning, Mode=TwoWay}" />
                             </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
+                            <ui:Button Content="Refresh" Command="{Binding RefreshCommand}" Margin="0,0,8,0" />
+                            <ui:Button Content="Import" Command="{Binding ImportCommand}" Margin="0,0,8,0" />
+                            <ui:Button Content="Export" Appearance="Primary" Command="{Binding ExportCommand}" />
+                        </StackPanel>
+                    </Grid>
 
-                    <TabItem Header="Activity">
-                        <ListBox ItemsSource="{Binding LogLines}" Margin="6"
-                                 FontFamily="Consolas" Background="Transparent" BorderThickness="0"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Auto">
-                            <ListBox.ItemContainerStyle>
-                                <Style TargetType="ListBoxItem">
-                                    <Setter Property="Padding" Value="4,1" />
+                    <!-- table + editor/log -->
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="420" />
+                        </Grid.ColumnDefinitions>
+
+                        <ui:Card Grid.Column="0" Padding="0">
+                            <DataGrid ItemsSource="{Binding ProcessView}"
+                                      SelectedItem="{Binding SelectedProcess, Mode=TwoWay}"
+                                      AutoGenerateColumns="False" IsReadOnly="True"
+                                      HeadersVisibility="Column" GridLinesVisibility="None"
+                                      CanUserResizeRows="False" CanUserAddRows="False" CanUserSortColumns="True"
+                                      SelectionMode="Single" SelectionUnit="FullRow"
+                                      Background="Transparent" BorderThickness="0" RowHeight="30"
+                                      EnableRowVirtualization="True"
+                                      VirtualizingPanel.IsVirtualizing="True"
+                                      VirtualizingPanel.VirtualizationMode="Recycling"
+                                      ScrollViewer.CanContentScroll="True"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow">
+                                        <Setter Property="ToolTip" Value="{Binding ExePath}" />
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                <DataGrid.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Set priority">
+                                            <MenuItem Header="Idle" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.Idle}" />
+                                            <MenuItem Header="Below normal" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.BelowNormal}" />
+                                            <MenuItem Header="Normal" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.Normal}" />
+                                            <MenuItem Header="Above normal" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.AboveNormal}" />
+                                            <MenuItem Header="High" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.High}" />
+                                        </MenuItem>
+                                        <Separator />
+                                        <MenuItem Header="Efficiency mode: On" Command="{Binding QuickEfficiencyCommand}" CommandParameter="True" />
+                                        <MenuItem Header="Efficiency mode: Off" Command="{Binding QuickEfficiencyCommand}" CommandParameter="False" />
+                                    </ContextMenu>
+                                </DataGrid.ContextMenu>
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Process" Binding="{Binding Name}" Width="2*" SortMemberPath="Name" />
+                                    <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="0.7*" />
+                                    <DataGridTextColumn Header="CPU %" Binding="{Binding CpuPercent, StringFormat={}{0:0}}" Width="0.7*" SortMemberPath="CpuPercent" />
+                                    <DataGridTextColumn Header="Priority" Binding="{Binding Cpu}" Width="1.1*" />
+                                    <DataGridTextColumn Header="Cores" Binding="{Binding Affinity}" Width="0.9*" />
+                                    <DataGridTextColumn Header="I/O" Binding="{Binding Io}" Width="0.8*" />
+                                    <DataGridTextColumn Header="Memory" Binding="{Binding Memory}" Width="0.9*" />
+                                    <DataGridTextColumn Header="Eco" Binding="{Binding Eco}" Width="0.5*" />
+                                    <DataGridTextColumn Header="RAM" Binding="{Binding WorkingSet}" Width="0.9*" />
+                                    <DataGridTextColumn Header="Rule" Binding="{Binding Rule}" Width="1.1*" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </ui:Card>
+
+                        <ui:Card Grid.Column="2" Padding="0">
+                            <TabControl>
+                                <TabItem Header="Rule">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Editor.TargetHeader}" FontSize="18" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Editor.TargetExePath}" Opacity="0.6" TextTrimming="CharacterEllipsis" Margin="0,2,0,14" />
+                                            <StackPanel IsEnabled="{Binding Editor.HasTarget}">
+                                                <TextBlock Text="CPU priority" Style="{StaticResource FieldLabel}" />
+                                                <ComboBox ItemsSource="{Binding Editor.CpuPriorityOptions}" SelectedItem="{Binding Editor.SelectedCpuPriority, Mode=TwoWay}" />
+                                                <TextBlock Text="CPU affinity (e.g. 0-7,16 — blank = all)" Style="{StaticResource FieldLabel}" />
+                                                <ui:TextBox Text="{Binding Editor.AffinityText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="all cores" />
+                                                <TextBlock Text="I/O priority" Style="{StaticResource FieldLabel}" />
+                                                <ComboBox ItemsSource="{Binding Editor.IoOptions}" SelectedItem="{Binding Editor.SelectedIo, Mode=TwoWay}" />
+                                                <TextBlock Text="Memory priority" Style="{StaticResource FieldLabel}" />
+                                                <ComboBox ItemsSource="{Binding Editor.MemoryOptions}" SelectedItem="{Binding Editor.SelectedMemory, Mode=TwoWay}" />
+                                                <TextBlock Text="Efficiency mode (EcoQoS)" Style="{StaticResource FieldLabel}" />
+                                                <ComboBox ItemsSource="{Binding Editor.EfficiencyOptions}" SelectedItem="{Binding Editor.SelectedEfficiency, Mode=TwoWay}" />
+                                                <TextBlock Text="Priority boost" Style="{StaticResource FieldLabel}" />
+                                                <ComboBox ItemsSource="{Binding Editor.BoostOptions}" SelectedItem="{Binding Editor.SelectedBoost, Mode=TwoWay}" />
+                                                <TextBlock Text="CPU sets" Style="{StaticResource FieldLabel}" />
+                                                <ComboBox ItemsSource="{Binding Editor.CpuSetOptions}" SelectedItem="{Binding Editor.SelectedCpuSet, Mode=TwoWay}" />
+                                                <ui:TextBox Margin="0,6,0,0"
+                                                            Text="{Binding Editor.CustomCpuSetText, UpdateSourceTrigger=PropertyChanged}"
+                                                            PlaceholderText="custom core list, e.g. 0-7"
+                                                            Visibility="{Binding Editor.IsCustomCpuSet, Converter={StaticResource BoolToVis}}" />
+                                                <TextBlock Text="GPU preference" Style="{StaticResource FieldLabel}" />
+                                                <ComboBox ItemsSource="{Binding Editor.GpuPreferenceOptions}" SelectedItem="{Binding Editor.SelectedGpuPreference, Mode=TwoWay}" />
+                                                <TextBlock Text="GPU scheduling priority" Style="{StaticResource FieldLabel}" />
+                                                <ComboBox ItemsSource="{Binding Editor.GpuSchedulingOptions}" SelectedItem="{Binding Editor.SelectedGpuScheduling, Mode=TwoWay}" />
+                                                <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
+                                                    <ui:Button Content="Apply now" Appearance="Secondary" Command="{Binding ApplyNowCommand}" Margin="0,0,8,0" />
+                                                    <ui:Button Content="Save rule" Appearance="Primary" Command="{Binding SaveRuleCommand}" Margin="0,0,8,0" />
+                                                    <ui:Button Content="Remove" Command="{Binding RemoveRuleCommand}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </TabItem>
+                                <TabItem Header="Activity">
+                                    <ListBox ItemsSource="{Binding LogLines}" Margin="6"
+                                             FontFamily="Consolas" Background="Transparent" BorderThickness="0"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Padding" Value="4,1" />
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                    </ListBox>
+                                </TabItem>
+                            </TabControl>
+                        </ui:Card>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- ============================ SYSTEM ============================ -->
+            <TabItem Header="System">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8,12,8,8">
+                    <StackPanel>
+                        <TextBlock Text="{Binding System.SensorStatus}" Foreground="#F0B400" TextWrapping="Wrap" Margin="4,0,4,12">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding System.SensorStatus}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
                                 </Style>
-                            </ListBox.ItemContainerStyle>
-                        </ListBox>
-                    </TabItem>
-                </TabControl>
-            </ui:Card>
-        </Grid>
+                            </TextBlock.Style>
+                        </TextBlock>
 
-        <!-- Status bar -->
-        <Border Grid.Row="3" Padding="16,8" Background="#16000000">
+                        <!-- live stat tiles -->
+                        <ItemsControl ItemsSource="{Binding System.Tiles}" Margin="0,0,0,6">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <ui:Card Width="150" Margin="4,4,4,10" Padding="14,10">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Label}" Opacity="0.65" FontSize="11" />
+                                            <TextBlock Text="{Binding Value}" FontSize="22" FontWeight="SemiBold" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </ui:Card>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- detailed inventory -->
+                        <ItemsControl ItemsSource="{Binding System.Sections}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <ui:Card Width="474" Margin="4,4,4,12" Padding="18" VerticalAlignment="Top">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                            <ItemsControl ItemsSource="{Binding Items}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="0,3">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="150" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" Text="{Binding Label}" Opacity="0.6" TextWrapping="Wrap" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </ui:Card>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <Border Grid.Row="2" Padding="16,8" Background="#16000000">
             <TextBlock Text="{Binding StatusText}" Opacity="0.85" />
         </Border>
     </Grid>

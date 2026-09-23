@@ -6,7 +6,7 @@ affinity, I/O priority, memory priority, efficiency mode / EcoQoS, CPU sets, pri
 preference and GPU scheduling priority), watch a live process table, and keep it all in an
 importable/exportable config.
 
-**Version:** 0.2.0 • **Platform:** Windows 10/11 x64 • **Runtime:** .NET 8 (Desktop)
+**Version:** 0.3.0 • **Platform:** Windows 10/11 x64 • **Runtime:** .NET 8 (Desktop)
 
 ---
 
@@ -34,6 +34,8 @@ log. Auto-start-at-logon is the next milestone.
 | Config save / load / import / export | Core | ✅ |
 | Logging (ring buffer + file) | Core | ✅ |
 | **Fluent GUI** (live table, rule editor, log) | App | ✅ implemented |
+| Live CPU% · right-click quick actions | App | ✅ implemented |
+| **System tab** (hardware inventory + live sensors) | App | ✅ implemented |
 | Auto-start at logon / tray | App | 🚧 planned |
 
 ---

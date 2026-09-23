@@ -31,6 +31,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICollectionView ProcessView { get; }
     public ObservableCollection<string> LogLines { get; } = new();
     public RuleEditorViewModel Editor { get; }
+    public SystemViewModel System { get; } = new();
 
     public RelayCommand ApplyNowCommand { get; }
     public RelayCommand SaveRuleCommand { get; }
@@ -73,6 +74,7 @@ public sealed class MainViewModel : ViewModelBase
         Refresh();
         _timer.Start();
         EngineRunning = true; // auto-run so rules take effect (toggle to pause)
+        System.Start();
     }
 
     // ---- selection ----
