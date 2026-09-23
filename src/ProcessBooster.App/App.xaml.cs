@@ -1,11 +1,14 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Threading;
+using ProcessBooster.App.Hardware;
 using ProcessBooster.App.ViewModels;
 using ProcessBooster.Core.Config;
 using ProcessBooster.Core.Logging;
 using ProcessBooster.Core.Models;
 using ProcessBooster.Core.Services;
+using Wpf.Ui.Appearance;
 
 namespace ProcessBooster.App;
 
@@ -59,7 +62,12 @@ public partial class App : Application
         catch (Exception ex) { log.Error($"Config load failed; starting empty: {ex.Message}"); config = new AppConfig(); }
 
         var engine = new RuleEngine(() => config, inspector, controller, log);
-        var vm = new MainViewModel(config, store, inspector, controller, topology, engine, log);
+        var monitor = new LiveMonitor();
+
+        // Cool violet accent (looks great on the dark Mica surface) instead of the default grey.
+        ApplicationAccentColorManager.Apply(Color.FromRgb(0x8B, 0x5C, 0xF6), ApplicationTheme.Dark);
+
+        var vm = new MainViewModel(config, store, inspector, controller, topology, engine, log, monitor);
 
         var window = new MainWindow { DataContext = vm };
         MainWindow = window;

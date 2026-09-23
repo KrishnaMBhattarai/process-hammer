@@ -3,8 +3,9 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  xmlns:core="clr-namespace:ProcessBooster.Core.Models;assembly=ProcessBooster.Core"
+                 xmlns:vm="clr-namespace:ProcessBooster.App.ViewModels"
                  Title="Process Booster"
-                 Width="1240" Height="800" MinWidth="980" MinHeight="620"
+                 Width="1280" Height="820" MinWidth="1000" MinHeight="640"
                  WindowStartupLocation="CenterScreen"
                  WindowBackdropType="Mica"
                  ExtendsContentIntoTitleBar="True">
@@ -17,6 +18,68 @@
             <Setter Property="FontWeight" Value="Medium" />
             <Setter Property="Opacity" Value="0.85" />
         </Style>
+
+        <!-- Shared layout for every hardware tab: note + live tiles + detail cards -->
+        <DataTemplate DataType="{x:Type vm:HardwareTabViewModel}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8,12,8,8">
+                <StackPanel>
+                    <TextBlock Text="{Binding Note}" Foreground="#F0B400" TextWrapping="Wrap" Margin="4,0,4,12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed" /></Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+
+                    <ItemsControl ItemsSource="{Binding Tiles}" Margin="0,0,0,6">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <ui:Card Width="150" Margin="4,4,4,10" Padding="14,10">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Label}" Opacity="0.65" FontSize="11" />
+                                        <TextBlock Text="{Binding Value}" FontSize="22" FontWeight="SemiBold" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </ui:Card>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <ItemsControl ItemsSource="{Binding Sections}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <ui:Card Width="478" Margin="4,4,4,12" Padding="18" VerticalAlignment="Top">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,3">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="160" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{Binding Label}" Opacity="0.6" TextWrapping="Wrap" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </ui:Card>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>
@@ -32,17 +95,22 @@
             </ui:TitleBar.Icon>
         </ui:TitleBar>
 
-        <TabControl Grid.Row="1" Margin="12,4,12,6">
+        <TabControl Grid.Row="1" Margin="12,4,12,6" SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
 
             <!-- ============================ PROCESSES ============================ -->
-            <TabItem Header="Processes">
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Apps24" Margin="0,0,8,0" />
+                        <TextBlock Text="Processes" VerticalAlignment="Center" />
+                    </StackPanel>
+                </TabItem.Header>
                 <Grid Margin="4,8,4,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <!-- toolbar -->
                     <Grid Grid.Row="0" Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -67,7 +135,6 @@
                         </StackPanel>
                     </Grid>
 
-                    <!-- table + editor/log -->
                     <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -178,74 +245,62 @@
                 </Grid>
             </TabItem>
 
-            <!-- ============================ SYSTEM ============================ -->
-            <TabItem Header="System">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8,12,8,8">
-                    <StackPanel>
-                        <TextBlock Text="{Binding System.SensorStatus}" Foreground="#F0B400" TextWrapping="Wrap" Margin="4,0,4,12">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding System.SensorStatus}" Value="">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-
-                        <!-- live stat tiles -->
-                        <ItemsControl ItemsSource="{Binding System.Tiles}" Margin="0,0,0,6">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <ui:Card Width="150" Margin="4,4,4,10" Padding="14,10">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Label}" Opacity="0.65" FontSize="11" />
-                                            <TextBlock Text="{Binding Value}" FontSize="22" FontWeight="SemiBold" Margin="0,4,0,0" />
-                                        </StackPanel>
-                                    </ui:Card>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <!-- detailed inventory -->
-                        <ItemsControl ItemsSource="{Binding System.Sections}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <ui:Card Width="474" Margin="4,4,4,12" Padding="18" VerticalAlignment="Top">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,10" />
-                                            <ItemsControl ItemsSource="{Binding Items}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Grid Margin="0,3">
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="150" />
-                                                                <ColumnDefinition Width="*" />
-                                                            </Grid.ColumnDefinitions>
-                                                            <TextBlock Grid.Column="0" Text="{Binding Label}" Opacity="0.6" TextWrapping="Wrap" />
-                                                            <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
-                                                        </Grid>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
-                                    </ui:Card>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+            <!-- ============================ HARDWARE TABS ============================ -->
+            <TabItem Content="{Binding SystemTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Board24" Margin="0,0,8,0" />
+                        <TextBlock Text="System" VerticalAlignment="Center" />
                     </StackPanel>
-                </ScrollViewer>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding CpuTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="DeveloperBoard24" Margin="0,0,8,0" />
+                        <TextBlock Text="CPU" VerticalAlignment="Center" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding MemoryTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Ram24" Margin="0,0,8,0" />
+                        <TextBlock Text="Memory" VerticalAlignment="Center" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding GraphicsTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Games24" Margin="0,0,8,0" />
+                        <TextBlock Text="Graphics" VerticalAlignment="Center" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding DisplayTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Desktop24" Margin="0,0,8,0" />
+                        <TextBlock Text="Display" VerticalAlignment="Center" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding StorageTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="HardDrive24" Margin="0,0,8,0" />
+                        <TextBlock Text="Storage" VerticalAlignment="Center" />
+                    </StackPanel>
+                </TabItem.Header>
+            </TabItem>
+            <TabItem Content="{Binding NetworkTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Globe24" Margin="0,0,8,0" />
+                        <TextBlock Text="Network" VerticalAlignment="Center" />
+                    </StackPanel>
+                </TabItem.Header>
             </TabItem>
         </TabControl>
 

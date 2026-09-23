@@ -46,3 +46,12 @@ public sealed record OptionItem(string Label, object? Value)
 {
     public override string ToString() => Label;
 }
+
+/// <summary>One live dashboard tile (label + big value), updated in place.</summary>
+public sealed class StatTile : ViewModelBase
+{
+    public string Label { get; }
+    private string _value = "—";
+    public string Value { get => _value; set => SetField(ref _value, value); }
+    public StatTile(string label) => Label = label;
+}

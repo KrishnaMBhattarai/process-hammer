@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Threading;
 using Microsoft.Win32;
+using ProcessBooster.App.Hardware;
 using ProcessBooster.Core.Config;
 using ProcessBooster.Core.Logging;
 using ProcessBooster.Core.Models;
@@ -31,7 +32,16 @@ public sealed class MainViewModel : ViewModelBase
     public ICollectionView ProcessView { get; }
     public ObservableCollection<string> LogLines { get; } = new();
     public RuleEditorViewModel Editor { get; }
-    public SystemViewModel System { get; } = new();
+    private readonly LiveMonitor _monitor;
+    private readonly HardwareTabViewModel?[] _tabByIndex;
+
+    public HardwareTabViewModel SystemTab { get; }
+    public HardwareTabViewModel CpuTab { get; }
+    public HardwareTabViewModel MemoryTab { get; }
+    public HardwareTabViewModel GraphicsTab { get; }
+    public HardwareTabViewModel DisplayTab { get; }
+    public HardwareTabViewModel StorageTab { get; }
+    public HardwareTabViewModel NetworkTab { get; }
 
     public RelayCommand ApplyNowCommand { get; }
     public RelayCommand SaveRuleCommand { get; }
@@ -43,12 +53,65 @@ public sealed class MainViewModel : ViewModelBase
     public RelayCommand QuickEfficiencyCommand { get; }
 
     public MainViewModel(AppConfig config, ConfigStore store, ProcessInspector inspector,
-        ProcessController controller, CpuTopology topology, RuleEngine engine, ActionLog log)
+        ProcessController controller, CpuTopology topology, RuleEngine engine, ActionLog log, LiveMonitor monitor)
     {
         _config = config; _store = store; _inspector = inspector;
-        _controller = controller; _engine = engine; _log = log;
+        _controller = controller; _engine = engine; _log = log; _monitor = monitor;
 
         Editor = new RuleEditorViewModel(topology);
+
+        var note = monitor.SensorNote is { } n
+            ? $"Live sensors couldn't start ({n}). Static specs are still shown; live temps/clocks/fan need the sensor driver + admin."
+            : null;
+
+        (string, Func<LiveMonitor, string>)[] Cpu() => new[]
+        {
+            ("CPU temp", (Func<LiveMonitor, string>)(m => Live.Fmt(m.Sensors.CpuTempC, "°C"))),
+            ("CPU load", m => Live.Fmt(m.Sensors.CpuLoad, "%")),
+            ("CPU clock", m => Live.Ghz(m.Sensors.CpuClockMhz)),
+            ("CPU power", m => Live.Fmt(m.Sensors.CpuPowerW, " W")),
+        };
+
+        SystemTab = new HardwareTabViewModel(SystemInfoService.Collect, monitor, new[]
+        {
+            ("CPU temp", (Func<LiveMonitor, string>)(m => Live.Fmt(m.Sensors.CpuTempC, "°C"))),
+            ("CPU load", m => Live.Fmt(m.Sensors.CpuLoad, "%")),
+            ("Memory", m => Live.Gb(m.Sensors.MemUsedGb)),
+            ("GPU temp", m => Live.Fmt(m.Sensors.GpuTempC, "°C")),
+            ("GPU load", m => Live.Fmt(m.Sensors.GpuLoad, "%")),
+            ("Net down", m => Live.Mbps(m.NetDownMbps)),
+            ("Net up", m => Live.Mbps(m.NetUpMbps)),
+        }, note);
+
+        CpuTab = new HardwareTabViewModel(
+            () => { var l = CpuInfoService.Collect(); l.Add(CpuCoresSection(topology)); return l; },
+            monitor, Cpu(), note);
+
+        MemoryTab = new HardwareTabViewModel(MemoryInfoService.Collect, monitor, new[]
+        {
+            ("Used", (Func<LiveMonitor, string>)(m => Live.Gb(m.Sensors.MemUsedGb))),
+            ("Load", m => Live.Fmt(m.Sensors.MemLoad, "%")),
+        }, note);
+
+        GraphicsTab = new HardwareTabViewModel(GraphicsInfoService.Collect, monitor, new[]
+        {
+            ("GPU temp", (Func<LiveMonitor, string>)(m => Live.Fmt(m.Sensors.GpuTempC, "°C"))),
+            ("GPU load", m => Live.Fmt(m.Sensors.GpuLoad, "%")),
+            ("GPU clock", m => Live.Mhz(m.Sensors.GpuClockMhz)),
+            ("GPU memory", m => Live.Vram(m.Sensors.GpuVramUsedGb, m.Sensors.GpuVramTotalGb)),
+        }, note);
+
+        DisplayTab = new HardwareTabViewModel(DisplayInfoService.Collect);
+        StorageTab = new HardwareTabViewModel(StorageInfoService.Collect);
+
+        NetworkTab = new HardwareTabViewModel(NetworkInfoService.Collect, monitor, new[]
+        {
+            ("Download", (Func<LiveMonitor, string>)(m => Live.Mbps(m.NetDownMbps))),
+            ("Upload", m => Live.Mbps(m.NetUpMbps)),
+        }, note);
+
+        // Index 0 = Processes (no hardware VM); 1..7 map to the hardware tabs, in the same order as the XAML.
+        _tabByIndex = new[] { null, SystemTab, CpuTab, MemoryTab, GraphicsTab, DisplayTab, StorageTab, NetworkTab };
 
         ProcessView = CollectionViewSource.GetDefaultView(Processes);
         ProcessView.Filter = FilterProcess;
@@ -72,9 +135,47 @@ public sealed class MainViewModel : ViewModelBase
         IsAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
         foreach (var e in _log.Recent()) LogLines.Add(e.ToString());
         Refresh();
-        _timer.Start();
+        _timer.Start();       // Processes tab (index 0) is active on launch
         EngineRunning = true; // auto-run so rules take effect (toggle to pause)
-        System.Start();
+    }
+
+    /// <summary>
+    /// Bound to the tab strip. Switching tabs pauses the work of the tab you left and starts only the
+    /// tab you opened: the Processes list refreshes only while visible; a hardware tab loads its static
+    /// specs once (first visit) and polls live sensors only while it is the active tab.
+    /// </summary>
+    private int _selectedTabIndex;
+    public int SelectedTabIndex
+    {
+        get => _selectedTabIndex;
+        set { var old = _selectedTabIndex; if (SetField(ref _selectedTabIndex, value)) OnTabChanged(old, value); }
+    }
+
+    private void OnTabChanged(int oldIndex, int newIndex)
+    {
+        if (oldIndex == 0) _timer.Stop();
+        else if (oldIndex > 0 && oldIndex < _tabByIndex.Length) _tabByIndex[oldIndex]?.Deactivate();
+
+        if (newIndex == 0) { _timer.Start(); Refresh(); }
+        else if (newIndex > 0 && newIndex < _tabByIndex.Length) _tabByIndex[newIndex]?.Activate();
+    }
+
+    /// <summary>Live per-logical-processor list with P/E-core classification (generic, from the OS topology).</summary>
+    private static InfoSection CpuCoresSection(CpuTopology topo)
+    {
+        var s = new InfoSection { Title = "Logical processors" };
+        var sets = topo.Sets.OrderBy(x => x.LogicalProcessorIndex).ToList();
+        if (sets.Count == 0) { s.Items.Add(new InfoItem("Cores", "—")); return s; }
+
+        var maxEff = sets.Max(x => x.EfficiencyClass);
+        var minEff = sets.Min(x => x.EfficiencyClass);
+        var hybrid = maxEff != minEff;
+        foreach (var c in sets)
+        {
+            var kind = !hybrid ? "Standard" : c.EfficiencyClass == maxEff ? "Performance" : "Efficiency";
+            s.Items.Add(new InfoItem($"CPU {c.LogicalProcessorIndex}", $"Core {c.CoreIndex} · {kind}"));
+        }
+        return s;
     }
 
     // ---- selection ----
