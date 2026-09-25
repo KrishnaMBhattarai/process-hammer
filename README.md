@@ -27,6 +27,19 @@ a small tip keeps development going. **Thank you!** 🙏
 
 ---
 
+## 🚀 Get it
+
+Two ways to run Process Hammer — both give you the exact same single portable `.exe`, no installer,
+no telemetry:
+
+- **⬇️ Download a release** — grab the latest ready-to-run build from the
+  **[Releases](https://github.com/KrishnaMBhattarai/process-hammer/releases)** tab and just run it.
+  *(Optional: [verify the SHA-256](#-verify-your-download-sha-256) first.)*
+- **🛠️ Build it yourself** — clone the repo and compile from source in a couple of commands. See
+  **[Build from source](#-build-from-source)** below.
+
+---
+
 ## 🎮 Built for gamers & PC builders
 
 - **Tune games for smoother frames.** Set a process to **High priority**, pin it to your **P-cores**,
@@ -130,6 +143,31 @@ task with highest privileges, so it starts elevated with no UAC prompt), or **Ex
 
 Everything is enumerated from the live system — **nothing is hardcoded**, so it works on any PC
 (any CPU vendor, GPU count, monitors, adapters…).
+
+---
+
+## 🎛️ What each option does
+
+Every setting is **optional** — a rule only touches what you choose; anything left at **"Leave
+unchanged"** is untouched. Unless noted, settings apply **instantly** to the running process and last
+until it exits or you remove the rule.
+
+| Option | What it controls | Values (low → high effect) |
+|---|---|---|
+| **CPU priority** | How often the scheduler gives it CPU time | **Idle · Below Normal · Normal · Above Normal · High · Realtime** — higher = more, more-frequent time slices. *Realtime* can starve Windows itself; use sparingly. |
+| **CPU affinity** *(hard limit)* | Which cores it's **allowed** to run on | **All cores · Performance (P) cores · Efficiency (E) cores · Custom** (tick individual cores). It will **never** run on unticked cores. |
+| **CPU sets** *(soft hint)* | Which cores it **prefers** | **All · P-cores · E-cores · Custom.** A preference only — Windows may still use other cores under load. Gentler than affinity. |
+| **I/O priority** | Disk read/write scheduling | **Very Low · Low · Normal.** Lower = yields the disk to other apps (good for background tasks). |
+| **Memory priority** | How soon its RAM pages get trimmed under memory pressure | **Very Low · Low · Medium · Below Normal · Normal.** Higher = pages stay resident longer. |
+| **Efficiency mode** *(EcoQoS)* | Power/heat vs. performance | **On** = parked on E-cores at low clocks (cool, quiet, battery-friendly) · **Off** = full performance. |
+| **Priority boost** | Windows' automatic focus/UI boost | **Enabled** (default, snappier when focused) · **Disabled** (steady, predictable — good for benchmarks). |
+| **GPU preference** | Which GPU the app uses | **System default · Power-saving (iGPU) · High performance (dGPU).** Saved in the registry; **takes effect on next launch.** |
+| **GPU priority** | Scheduling priority for its GPU work | **Idle · Below Normal · Normal · Above Normal · High · Realtime.** |
+| **Power plan** | The **system-wide** Windows power scheme | **High Performance · Balanced · Power Saver** (+ any custom plans). Affects the whole PC and is a one-off switch — not saved in a rule. |
+
+> **Protected processes:** most anti-cheat games and core Windows processes can be *read* but not
+> *modified* by any user-mode tool — those settings will report **Failed (access denied)**. GPU
+> preference and power plan still work on them.
 
 ---
 
