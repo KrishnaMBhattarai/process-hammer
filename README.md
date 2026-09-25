@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="docs/logo.png" width="180" alt="Process Hammer logo">
+</div>
+
 # ⚡ Process Hammer
 
 **See everything about your Windows PC — and take control of it.** A free, open-source system
