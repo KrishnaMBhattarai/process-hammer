@@ -342,6 +342,7 @@ public sealed class MainViewModel : ViewModelBase
         set
         {
             if (!SetField(ref _selected, value)) return;
+            StatusMessage = ""; // fresh selection, clear the last result
             // Read the current settings that aren't in the live table (CPU sets, GPU priority/preference)
             // once per selection, so both the menu checkmarks and the editor reflect reality.
             _extras = value is null ? default : _controller.ReadCurrentExtras(value.Pid, value.ExePath);
@@ -469,7 +470,30 @@ public sealed class MainViewModel : ViewModelBase
         Act(p, _controller.SetEfficiencyMode(p.Pid, on));
     }
 
-    private void Act(ProcessRowViewModel p, ActionResult r) => _log.Action($"{p.Name} (pid {p.Pid}) {r}");
+    private void Act(ProcessRowViewModel p, ActionResult r)
+    {
+        _log.Action($"{p.Name} (pid {p.Pid}) {r}");
+        ShowActionStatus(p.Name, r);
+    }
+
+    // A short, visible result of the last user action (successes clear it; failures explain why).
+    private string _statusMessage = "";
+    public string StatusMessage { get => _statusMessage; private set => SetField(ref _statusMessage, value); }
+
+    private void ShowActionStatus(string name, ActionResult r)
+    {
+        var denied = r.Detail is { } d && (d.Contains("error 5") || d.Contains("0xC0000022"));
+        StatusMessage = r.Status switch
+        {
+            ActionStatus.Failed when denied =>
+                $"⚠  {name} is a protected process (anti-cheat / system) — it can't be modified, even as admin. " +
+                "GPU preference and the power profile still work, and you can lower OTHER apps' priority to free resources for it.",
+            ActionStatus.Failed => $"⚠  {r.Action} failed: {r.Detail}",
+            ActionStatus.Unsupported => $"{r.Action}: {r.Detail}",
+            ActionStatus.Applied => $"✓  {r.Action} applied to {name}.",
+            _ => "",
+        };
+    }
 
     /// <summary>Resolve the exe path on demand (needed for GPU preference + restart) if not already known.</summary>
     private void EnsureExePath(ProcessRowViewModel p)
@@ -803,7 +827,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             _config.Rules.Add(rule);
             _log.Info($"Saved rule for {rule.Match}.");
-            foreach (var r in _controller.ApplyRule(rule, p.Pid, p.ExePath)) _log.Action($"{p.Name} (pid {p.Pid}) {r}");
+            foreach (var r in _controller.ApplyRule(rule, p.Pid, p.ExePath)) Act(p, r);
         }
         else _log.Info($"Cleared rule for {p.Name} (no settings chosen).");
         Persist();

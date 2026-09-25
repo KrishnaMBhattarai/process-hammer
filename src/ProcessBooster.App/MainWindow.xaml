@@ -463,6 +463,18 @@
                                                 <ui:Button Content="Apply" Appearance="Primary" Command="{Binding SaveRuleCommand}"
                                                            HorizontalAlignment="Stretch" Margin="0,18,0,0"
                                                            ToolTip="Apply these settings to the process and keep them enforced (saved as a rule). Remove a rule via right-click → Remove saved rule." />
+                                                <Border Margin="0,12,0,0" CornerRadius="6" Padding="10,8" Background="#332B2B00">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding StatusMessage}" Value="">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock Text="{Binding StatusMessage}" Foreground="#F0B400" TextWrapping="Wrap" FontSize="12" />
+                                                </Border>
                                             </StackPanel>
                                         </StackPanel>
                                     </ScrollViewer>
