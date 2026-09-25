@@ -11,6 +11,7 @@ using ProcessBooster.Core.Config;
 using ProcessBooster.Core.Logging;
 using ProcessBooster.Core.Models;
 using ProcessBooster.Core.Services;
+using ProcessBooster.Core.Util;
 
 namespace ProcessBooster.App.ViewModels;
 
@@ -123,6 +124,7 @@ public sealed class MainViewModel : ViewModelBase
         _topology = topology;
 
         Editor = new RuleEditorViewModel(topology);
+        Editor.SettingChangedByUser += OnEditorLiveChange; // panel edit → apply live + mirror to menu
 
         var note = monitor.SensorNote is { } n
             ? $"Live sensors couldn't start ({n}). Static specs are still shown; live temps/clocks/fan need the sensor driver + admin."
@@ -350,7 +352,7 @@ public sealed class MainViewModel : ViewModelBase
             {
                 var pid = value.Pid; var name = value.Name;
                 Editor.SetTarget(name, pid, value.ExePath);
-                Editor.LoadFrom(FindRule(name), CurrentOf(value));
+                Editor.LoadFrom(null, CurrentOf(value));
 
                 // Resolve the exe path lazily off-thread (needed for GPU preference) so selection is instant.
                 if (value.ExePath is null)
@@ -362,7 +364,7 @@ public sealed class MainViewModel : ViewModelBase
                             value.ExePath = path;
                             _extras = _controller.ReadCurrentExtras(pid, path); // now GPU preference is readable
                             Editor.SetTarget(name, pid, path);
-                            Editor.LoadFrom(FindRule(name), CurrentOf(value));
+                            Editor.LoadFrom(null, CurrentOf(value));
                             RefreshMenuChecks();
                         }
                     }, TaskScheduler.FromCurrentSynchronizationContext());
@@ -515,7 +517,8 @@ public sealed class MainViewModel : ViewModelBase
         new(label, value, o => { apply(o); RefreshSelectedState(); });
 
     /// <summary>Re-read the selected process's live settings from the OS, then refresh all checkmarks.</summary>
-    private void RefreshSelectedState()
+    /// <summary>Re-read the selected process and refresh the right-click menu checkmarks (not the panel).</summary>
+    private void RefreshMenuFromState()
     {
         if (SelectedProcess is { } p)
         {
@@ -527,10 +530,55 @@ public sealed class MainViewModel : ViewModelBase
             }
             catch { /* process may have exited */ }
             RefreshAffinityCores(p.AffinityMaskRaw);
-            // Keep the Rule panel mirrored to the menu: reload it from the new current state.
-            Editor.LoadFrom(FindRule(p.Name), CurrentOf(p));
         }
         RefreshMenuChecks();
+    }
+
+    /// <summary>After a MENU action: refresh the menu AND reload the Rule panel from the new live state.</summary>
+    private void RefreshSelectedState()
+    {
+        RefreshMenuFromState();
+        if (SelectedProcess is { } p) Editor.LoadFrom(null, CurrentOf(p));
+    }
+
+    private bool _applyingLive;
+
+    /// <summary>A user tweak in the Rule PANEL: apply that setting live to the process, then mirror to the menu.</summary>
+    private void OnEditorLiveChange(RuleEditorViewModel.EditorSetting field)
+    {
+        if (_applyingLive || SelectedProcess is not { } p) return;
+        _applyingLive = true;
+        try
+        {
+            switch (field)
+            {
+                case RuleEditorViewModel.EditorSetting.CpuPriority:
+                    if ((CpuPriority?)Editor.SelectedCpuPriority?.Value is { } cp) Act(p, _controller.SetCpuPriority(p.Pid, cp)); break;
+                case RuleEditorViewModel.EditorSetting.Io:
+                    if ((IoPriority?)Editor.SelectedIo?.Value is { } io) Act(p, _controller.SetIoPriority(p.Pid, io)); break;
+                case RuleEditorViewModel.EditorSetting.Memory:
+                    if ((MemoryPriority?)Editor.SelectedMemory?.Value is { } mp) Act(p, _controller.SetMemoryPriority(p.Pid, mp)); break;
+                case RuleEditorViewModel.EditorSetting.Efficiency:
+                    if ((bool?)Editor.SelectedEfficiency?.Value is { } eco) Act(p, _controller.SetEfficiencyMode(p.Pid, eco)); break;
+                case RuleEditorViewModel.EditorSetting.Boost:
+                    if ((bool?)Editor.SelectedBoost?.Value is { } dis) Act(p, _controller.SetPriorityBoostDisabled(p.Pid, dis)); break;
+                case RuleEditorViewModel.EditorSetting.GpuPreference:
+                    if ((GpuPreference?)Editor.SelectedGpuPreference?.Value is { } gp) { EnsureExePath(p); Act(p, _controller.SetGpuPreference(p.ExePath, gp)); } break;
+                case RuleEditorViewModel.EditorSetting.GpuScheduling:
+                    if ((GpuSchedulingPriority?)Editor.SelectedGpuScheduling?.Value is { } gs) Act(p, _controller.SetGpuSchedulingPriority(p.Pid, gs)); break;
+                case RuleEditorViewModel.EditorSetting.CpuSet:
+                    var sel = (CpuSetSelection?)Editor.SelectedCpuSet?.Value ?? CpuSetSelection.Unset;
+                    if (sel != CpuSetSelection.Unset)
+                        Act(p, _controller.SetCpuSets(p.Pid, sel, sel == CpuSetSelection.Custom ? Editor.CustomCpuSetIds() : null));
+                    break;
+                case RuleEditorViewModel.EditorSetting.Affinity:
+                    if (AffinityMask.TryParseRangeString(Editor.AffinityText, 64, out var mask))
+                        Act(p, _controller.SetAffinity(p.Pid, mask == 0 ? AllCoresMask() : mask));
+                    break;
+            }
+            RefreshMenuFromState(); // mirror to the menu; leave the panel as the user set it
+        }
+        finally { _applyingLive = false; }
     }
 
     /// <summary>Tick the menu item matching each current setting on the selected process.</summary>

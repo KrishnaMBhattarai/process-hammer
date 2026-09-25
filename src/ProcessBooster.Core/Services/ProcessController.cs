@@ -213,8 +213,11 @@ public sealed class ProcessController
     }
 
     /// <summary>Current per-exe GPU preference from the registry (SystemDefault if none set).</summary>
-    public GpuPreference? ReadGpuPreference(string? exePath) =>
-        string.IsNullOrWhiteSpace(exePath) ? null : _gpuPrefs.Get(exePath!);
+    public GpuPreference? ReadGpuPreference(string? exePath)
+    {
+        if (string.IsNullOrWhiteSpace(exePath)) return null;
+        try { return _gpuPrefs.Get(exePath!); } catch { return null; }
+    }
 
     // ---- one-shot lifecycle actions (not part of a saved rule) ----
 

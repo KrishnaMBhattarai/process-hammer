@@ -111,29 +111,38 @@ public sealed class RuleEditorViewModel : ViewModelBase
     public List<OptionItem> BoostOptions { get; }
     public List<OptionItem> CpuSetOptions { get; }
 
+    // ---- live change signal (a user tweak here applies immediately + mirrors to the menu) ----
+    public enum EditorSetting { CpuPriority, Io, Memory, Efficiency, Boost, CpuSet, GpuPreference, GpuScheduling, Affinity }
+    public event Action<EditorSetting>? SettingChangedByUser;
+    private bool _loading;
+    private void Fire(EditorSetting s) { if (!_loading) SettingChangedByUser?.Invoke(s); }
+
+    /// <summary>Set-ids for the current custom core list (exposed so the host can apply CPU sets live).</summary>
+    public IReadOnlyList<uint> CustomCpuSetIds() => SetIdsFromIndices(CustomCpuSetText);
+
     // ---- selected values ----
     private OptionItem? _cpu, _io, _mem, _gpuPref, _gpuSched, _eco, _boost, _cpuSet;
     private string _affinityText = "";
     private string _customCpuSetText = "";
 
-    public OptionItem? SelectedCpuPriority { get => _cpu; set => SetField(ref _cpu, value); }
-    public OptionItem? SelectedIo { get => _io; set => SetField(ref _io, value); }
-    public OptionItem? SelectedMemory { get => _mem; set => SetField(ref _mem, value); }
-    public OptionItem? SelectedGpuPreference { get => _gpuPref; set => SetField(ref _gpuPref, value); }
-    public OptionItem? SelectedGpuScheduling { get => _gpuSched; set => SetField(ref _gpuSched, value); }
-    public OptionItem? SelectedEfficiency { get => _eco; set => SetField(ref _eco, value); }
-    public OptionItem? SelectedBoost { get => _boost; set => SetField(ref _boost, value); }
+    public OptionItem? SelectedCpuPriority { get => _cpu; set { if (SetField(ref _cpu, value)) Fire(EditorSetting.CpuPriority); } }
+    public OptionItem? SelectedIo { get => _io; set { if (SetField(ref _io, value)) Fire(EditorSetting.Io); } }
+    public OptionItem? SelectedMemory { get => _mem; set { if (SetField(ref _mem, value)) Fire(EditorSetting.Memory); } }
+    public OptionItem? SelectedGpuPreference { get => _gpuPref; set { if (SetField(ref _gpuPref, value)) Fire(EditorSetting.GpuPreference); } }
+    public OptionItem? SelectedGpuScheduling { get => _gpuSched; set { if (SetField(ref _gpuSched, value)) Fire(EditorSetting.GpuScheduling); } }
+    public OptionItem? SelectedEfficiency { get => _eco; set { if (SetField(ref _eco, value)) Fire(EditorSetting.Efficiency); } }
+    public OptionItem? SelectedBoost { get => _boost; set { if (SetField(ref _boost, value)) Fire(EditorSetting.Boost); } }
 
     public OptionItem? SelectedCpuSet
     {
         get => _cpuSet;
-        set { if (SetField(ref _cpuSet, value)) Raise(nameof(IsCustomCpuSet)); }
+        set { if (SetField(ref _cpuSet, value)) { Raise(nameof(IsCustomCpuSet)); Fire(EditorSetting.CpuSet); } }
     }
 
     public bool IsCustomCpuSet => (CpuSetSelection?)SelectedCpuSet?.Value == CpuSetSelection.Custom;
 
-    public string AffinityText { get => _affinityText; set => SetField(ref _affinityText, value); }
-    public string CustomCpuSetText { get => _customCpuSetText; set => SetField(ref _customCpuSetText, value); }
+    public string AffinityText { get => _affinityText; set { if (SetField(ref _affinityText, value)) Fire(EditorSetting.Affinity); } }
+    public string CustomCpuSetText { get => _customCpuSetText; set { if (SetField(ref _customCpuSetText, value)) Fire(EditorSetting.CpuSet); } }
 
     public void SetTarget(string name, int pid, string? exePath)
     {
@@ -159,26 +168,31 @@ public sealed class RuleEditorViewModel : ViewModelBase
     /// </summary>
     public void LoadFrom(ProcessRule? rule, CurrentState? current = null)
     {
-        var c = current ?? default;
-        var boostDisabled = rule?.DisablePriorityBoost ?? (c.BoostEnabled is { } en ? !en : (bool?)null);
+        _loading = true; // programmatic fill must not trigger a live re-apply
+        try
+        {
+            var c = current ?? default;
+            var boostDisabled = rule?.DisablePriorityBoost ?? (c.BoostEnabled is { } en ? !en : (bool?)null);
 
-        var cpuSet = rule is { } r && r.CpuSetSelection != CpuSetSelection.Unset
-            ? r.CpuSetSelection : c.CpuSets ?? CpuSetSelection.Unset;
+            var cpuSet = rule is { } r && r.CpuSetSelection != CpuSetSelection.Unset
+                ? r.CpuSetSelection : c.CpuSets ?? CpuSetSelection.Unset;
 
-        SelectedCpuPriority = Match(CpuPriorityOptions, rule?.CpuPriority ?? c.Cpu);
-        SelectedIo = Match(IoOptions, rule?.IoPriority ?? c.Io);
-        SelectedMemory = Match(MemoryOptions, rule?.MemoryPriority ?? c.Memory);
-        SelectedGpuPreference = Match(GpuPreferenceOptions, rule?.GpuPreference ?? c.GpuPreference);
-        SelectedGpuScheduling = Match(GpuSchedulingOptions, rule?.GpuSchedulingPriority ?? c.GpuScheduling);
-        SelectedEfficiency = Match(EfficiencyOptions, rule?.EfficiencyMode ?? c.Eco);
-        SelectedBoost = Match(BoostOptions, boostDisabled);
-        SelectedCpuSet = Match(CpuSetOptions, cpuSet) ?? CpuSetOptions[0];
+            SelectedCpuPriority = Match(CpuPriorityOptions, rule?.CpuPriority ?? c.Cpu);
+            SelectedIo = Match(IoOptions, rule?.IoPriority ?? c.Io);
+            SelectedMemory = Match(MemoryOptions, rule?.MemoryPriority ?? c.Memory);
+            SelectedGpuPreference = Match(GpuPreferenceOptions, rule?.GpuPreference ?? c.GpuPreference);
+            SelectedGpuScheduling = Match(GpuSchedulingOptions, rule?.GpuSchedulingPriority ?? c.GpuScheduling);
+            SelectedEfficiency = Match(EfficiencyOptions, rule?.EfficiencyMode ?? c.Eco);
+            SelectedBoost = Match(BoostOptions, boostDisabled);
+            SelectedCpuSet = Match(CpuSetOptions, cpuSet) ?? CpuSetOptions[0];
 
-        var affinity = rule?.AffinityMask is { } m && m != 0 ? m
-            : c.Affinity is { } am && am != 0 ? am : (ulong?)null;
-        AffinityText = NormalizeAffinity(affinity);
-        CustomCpuSetText = rule is { CpuSetSelection: CpuSetSelection.Custom } ? IndicesFromSetIds(rule.CpuSetIds) : "";
-        SyncAffinityCoresFromText();
+            var affinity = rule?.AffinityMask is { } m && m != 0 ? m
+                : c.Affinity is { } am && am != 0 ? am : (ulong?)null;
+            AffinityText = NormalizeAffinity(affinity);
+            CustomCpuSetText = rule is { CpuSetSelection: CpuSetSelection.Custom } ? IndicesFromSetIds(rule.CpuSetIds) : "";
+            SyncAffinityCoresFromText();
+        }
+        finally { _loading = false; }
     }
 
     /// <summary>All-cores (or empty) masks render as blank; a real subset renders as a range string.</summary>
