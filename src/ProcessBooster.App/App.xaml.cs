@@ -63,11 +63,12 @@ public partial class App : Application
 
         var engine = new RuleEngine(() => config, inspector, controller, log);
         var monitor = new LiveMonitor();
+        var power = new PowerService();
 
         // Cool violet accent (looks great on the dark Mica surface) instead of the default grey.
         ApplicationAccentColorManager.Apply(Color.FromRgb(0x8B, 0x5C, 0xF6), ApplicationTheme.Dark);
 
-        var vm = new MainViewModel(config, store, inspector, controller, topology, engine, log, monitor);
+        var vm = new MainViewModel(config, store, inspector, controller, topology, engine, log, monitor, power);
 
         var window = new MainWindow { DataContext = vm };
         MainWindow = window;

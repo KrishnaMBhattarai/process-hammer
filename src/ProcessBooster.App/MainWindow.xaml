@@ -321,6 +321,7 @@
                                 <DataGrid.RowStyle>
                                     <Style TargetType="DataGridRow">
                                         <Setter Property="ToolTip" Value="{Binding ExePath}" />
+                                        <EventSetter Event="PreviewMouseRightButtonDown" Handler="DataGridRow_RightClick" />
                                         <Style.Triggers>
                                             <Trigger Property="IsSelected" Value="True">
                                                 <Setter Property="Background" Value="{StaticResource AccentPurple}" />
@@ -331,16 +332,81 @@
                                 </DataGrid.RowStyle>
                                 <DataGrid.ContextMenu>
                                     <ContextMenu>
-                                        <MenuItem Header="Set priority">
+                                        <MenuItem Header="CPU priority">
                                             <MenuItem Header="Idle" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.Idle}" />
                                             <MenuItem Header="Below normal" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.BelowNormal}" />
                                             <MenuItem Header="Normal" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.Normal}" />
                                             <MenuItem Header="Above normal" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.AboveNormal}" />
                                             <MenuItem Header="High" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.High}" />
+                                            <MenuItem Header="Realtime" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.Realtime}" />
+                                        </MenuItem>
+                                        <MenuItem Header="CPU affinity" ItemsSource="{Binding AffinityCores}">
+                                            <MenuItem.ItemContainerStyle>
+                                                <Style TargetType="MenuItem">
+                                                    <Setter Property="Header" Value="{Binding Label}" />
+                                                    <Setter Property="IsCheckable" Value="True" />
+                                                    <Setter Property="StaysOpenOnClick" Value="True" />
+                                                    <Setter Property="IsChecked" Value="{Binding IsChecked, Mode=TwoWay}" />
+                                                </Style>
+                                            </MenuItem.ItemContainerStyle>
+                                        </MenuItem>
+                                        <MenuItem Header="CPU sets">
+                                            <MenuItem Header="All cores" Command="{Binding QuickCpuSetCommand}" CommandParameter="{x:Static core:CpuSetSelection.All}" />
+                                            <MenuItem Header="Performance cores" Command="{Binding QuickCpuSetCommand}" CommandParameter="{x:Static core:CpuSetSelection.PerformanceCores}" />
+                                            <MenuItem Header="Efficiency cores" Command="{Binding QuickCpuSetCommand}" CommandParameter="{x:Static core:CpuSetSelection.EfficiencyCores}" />
+                                        </MenuItem>
+                                        <MenuItem Header="I/O priority">
+                                            <MenuItem Header="Very low" Command="{Binding QuickIoCommand}" CommandParameter="{x:Static core:IoPriority.VeryLow}" />
+                                            <MenuItem Header="Low" Command="{Binding QuickIoCommand}" CommandParameter="{x:Static core:IoPriority.Low}" />
+                                            <MenuItem Header="Normal" Command="{Binding QuickIoCommand}" CommandParameter="{x:Static core:IoPriority.Normal}" />
+                                        </MenuItem>
+                                        <MenuItem Header="Memory priority">
+                                            <MenuItem Header="Very low" Command="{Binding QuickMemoryCommand}" CommandParameter="{x:Static core:MemoryPriority.VeryLow}" />
+                                            <MenuItem Header="Low" Command="{Binding QuickMemoryCommand}" CommandParameter="{x:Static core:MemoryPriority.Low}" />
+                                            <MenuItem Header="Medium" Command="{Binding QuickMemoryCommand}" CommandParameter="{x:Static core:MemoryPriority.Medium}" />
+                                            <MenuItem Header="Below normal" Command="{Binding QuickMemoryCommand}" CommandParameter="{x:Static core:MemoryPriority.BelowNormal}" />
+                                            <MenuItem Header="Normal" Command="{Binding QuickMemoryCommand}" CommandParameter="{x:Static core:MemoryPriority.Normal}" />
+                                        </MenuItem>
+                                        <MenuItem Header="GPU priority">
+                                            <MenuItem Header="Idle" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.Idle}" />
+                                            <MenuItem Header="Below normal" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.BelowNormal}" />
+                                            <MenuItem Header="Normal" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.Normal}" />
+                                            <MenuItem Header="Above normal" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.AboveNormal}" />
+                                            <MenuItem Header="High" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.High}" />
+                                            <MenuItem Header="Realtime" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.Realtime}" />
+                                        </MenuItem>
+                                        <MenuItem Header="GPU preference (applies on relaunch)">
+                                            <MenuItem Header="System default" Command="{Binding QuickGpuPreferenceCommand}" CommandParameter="{x:Static core:GpuPreference.SystemDefault}" />
+                                            <MenuItem Header="Power saving" Command="{Binding QuickGpuPreferenceCommand}" CommandParameter="{x:Static core:GpuPreference.PowerSaving}" />
+                                            <MenuItem Header="High performance" Command="{Binding QuickGpuPreferenceCommand}" CommandParameter="{x:Static core:GpuPreference.HighPerformance}" />
+                                        </MenuItem>
+                                        <MenuItem Header="Efficiency mode">
+                                            <MenuItem Header="On (EcoQoS)" Command="{Binding QuickEfficiencyCommand}" CommandParameter="True" />
+                                            <MenuItem Header="Off (system-managed)" Command="{Binding QuickEfficiencyCommand}" CommandParameter="False" />
+                                        </MenuItem>
+                                        <MenuItem Header="Priority boost">
+                                            <MenuItem Header="Enabled" Command="{Binding QuickBoostCommand}" CommandParameter="False" />
+                                            <MenuItem Header="Disabled" Command="{Binding QuickBoostCommand}" CommandParameter="True" />
+                                        </MenuItem>
+                                        <MenuItem Header="Power profile" ItemsSource="{Binding PowerProfiles}">
+                                            <MenuItem.ItemContainerStyle>
+                                                <Style TargetType="MenuItem">
+                                                    <Setter Property="Header" Value="{Binding Name}" />
+                                                    <Setter Property="IsCheckable" Value="True" />
+                                                    <Setter Property="IsChecked" Value="{Binding IsActive, Mode=OneWay}" />
+                                                    <Setter Property="Command" Value="{Binding SelectCommand}" />
+                                                </Style>
+                                            </MenuItem.ItemContainerStyle>
                                         </MenuItem>
                                         <Separator />
-                                        <MenuItem Header="Efficiency mode: On" Command="{Binding QuickEfficiencyCommand}" CommandParameter="True" />
-                                        <MenuItem Header="Efficiency mode: Off" Command="{Binding QuickEfficiencyCommand}" CommandParameter="False" />
+                                        <MenuItem Header="Trim memory (empty working set)" Command="{Binding TrimMemoryCommand}" />
+                                        <MenuItem Header="Copy rule / settings" Command="{Binding CopyRuleCommand}" />
+                                        <MenuItem Header="Remove saved rule" Command="{Binding RemoveRuleCommand}" />
+                                        <Separator />
+                                        <MenuItem Header="Restart" Command="{Binding RestartProcessCommand}" />
+                                        <MenuItem Header="Restart as admin" Command="{Binding RestartAsAdminCommand}" />
+                                        <MenuItem Header="Close" Command="{Binding CloseProcessCommand}" />
+                                        <MenuItem Header="Terminate" Command="{Binding TerminateProcessCommand}" />
                                     </ContextMenu>
                                 </DataGrid.ContextMenu>
                                 <DataGrid.Columns>
@@ -352,6 +418,7 @@
                                     <DataGridTextColumn Header="I/O" Binding="{Binding Io}" Width="0.8*" />
                                     <DataGridTextColumn Header="Memory" Binding="{Binding Memory}" Width="0.9*" />
                                     <DataGridTextColumn Header="Eco" Binding="{Binding Eco}" Width="0.5*" />
+                                    <DataGridTextColumn Header="Threads" Binding="{Binding Threads}" Width="0.7*" SortMemberPath="Threads" />
                                     <DataGridTextColumn Header="RAM" Binding="{Binding WorkingSet}" Width="0.9*" />
                                     <DataGridTextColumn Header="Rule" Binding="{Binding Rule}" Width="1.1*" />
                                 </DataGrid.Columns>
@@ -411,6 +478,92 @@
                             </TabControl>
                         </ui:Card>
                     </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- ============================ BOOSTER RULES ============================ -->
+            <TabItem Style="{StaticResource MainTab}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Options24" Style="{StaticResource TabIcon}" />
+                        <TextBlock Text="Booster Rules" Style="{StaticResource TabHeaderText}" />
+                    </StackPanel>
+                </TabItem.Header>
+                <Grid Margin="4,8,4,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center" Opacity="0.8" TextWrapping="Wrap"
+                                   Text="Saved booster rules — the settings Process Booster keeps applied to each matching process. Select a rule to apply, enable/disable or remove it." />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <ui:Button Content="Apply now" Command="{Binding ApplySelectedRuleCommand}" Margin="0,0,8,0" />
+                            <ui:Button Content="Enable / Disable" Command="{Binding ToggleRuleEnabledCommand}" Margin="0,0,8,0" />
+                            <ui:Button Content="Remove" Command="{Binding RemoveSelectedRuleCommand}" Margin="0,0,8,0" />
+                            <ui:Button Content="Remove all" Command="{Binding RemoveAllRulesCommand}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <ui:Card Grid.Row="1" Padding="0">
+                        <DataGrid ItemsSource="{Binding BoosterRules}"
+                                  SelectedItem="{Binding SelectedRule, Mode=TwoWay}"
+                                  AutoGenerateColumns="False" IsReadOnly="True"
+                                  HeadersVisibility="Column" GridLinesVisibility="None"
+                                  CanUserResizeRows="False" CanUserAddRows="False" CanUserSortColumns="True"
+                                  SelectionMode="Single" SelectionUnit="FullRow"
+                                  Background="Transparent" BorderThickness="0" RowHeight="30"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <DataGrid.Resources>
+                                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#8B5CF6" />
+                                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#8B5CF6" />
+                                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White" />
+                                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="White" />
+                            </DataGrid.Resources>
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow">
+                                    <EventSetter Event="PreviewMouseRightButtonDown" Handler="DataGridRow_RightClick" />
+                                    <Style.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource AccentPurple}" />
+                                            <Setter Property="Foreground" Value="White" />
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Apply now" Command="{Binding ApplySelectedRuleCommand}" />
+                                    <MenuItem Header="Enable / Disable" Command="{Binding ToggleRuleEnabledCommand}" />
+                                    <Separator />
+                                    <MenuItem Header="Remove rule" Command="{Binding RemoveSelectedRuleCommand}" />
+                                    <MenuItem Header="Remove all rules" Command="{Binding RemoveAllRulesCommand}" />
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Process" Binding="{Binding Process}" Width="1.4*" SortMemberPath="Process" />
+                                <DataGridTextColumn Header="Status" Binding="{Binding RunningText}" Width="1*" />
+                                <DataGridTextColumn Header="Enabled" Binding="{Binding EnabledText}" Width="0.7*" />
+                                <DataGridTextColumn Header="Priority" Binding="{Binding Cpu}" Width="1*" />
+                                <DataGridTextColumn Header="Cores" Binding="{Binding Affinity}" Width="1*" />
+                                <DataGridTextColumn Header="I/O" Binding="{Binding Io}" Width="0.8*" />
+                                <DataGridTextColumn Header="Memory" Binding="{Binding Memory}" Width="0.9*" />
+                                <DataGridTextColumn Header="Eco" Binding="{Binding Eco}" Width="0.6*" />
+                                <DataGridTextColumn Header="Boost" Binding="{Binding Boost}" Width="0.8*" />
+                                <DataGridTextColumn Header="CPU sets" Binding="{Binding CpuSets}" Width="1*" />
+                                <DataGridTextColumn Header="GPU pref" Binding="{Binding GpuPref}" Width="1*" />
+                                <DataGridTextColumn Header="GPU prio" Binding="{Binding GpuSched}" Width="1*" />
+                                <DataGridTextColumn Header="Power plan" Binding="{Binding PowerPlan}" Width="1*" />
+                                <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="1.2*" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </ui:Card>
                 </Grid>
             </TabItem>
 
