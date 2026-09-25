@@ -25,14 +25,15 @@
         <Style x:Key="TabIcon" TargetType="ui:SymbolIcon">
             <Setter Property="FontSize" Value="18" />
             <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Foreground" Value="White" />
         </Style>
 
-        <!-- Header text goes white + semibold on the purple selected tab -->
+        <!-- Tab header text is white; the selected tab adds semibold on its purple fill. -->
         <Style x:Key="TabHeaderText" TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="White" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="True">
-                    <Setter Property="Foreground" Value="White" />
                     <Setter Property="FontWeight" Value="SemiBold" />
                 </DataTrigger>
             </Style.Triggers>
