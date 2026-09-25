@@ -50,6 +50,7 @@
                                 CornerRadius="8"
                                 Padding="{TemplateBinding Padding}"
                                 Margin="{TemplateBinding Margin}"
+                                TextElement.Foreground="White"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter ContentSource="Header"
                                               HorizontalAlignment="Center"
