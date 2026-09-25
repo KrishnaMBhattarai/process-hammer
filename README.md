@@ -9,6 +9,19 @@ just one portable `.exe`.
 One window instead of a pile of utilities: live hardware readouts, a process table you can actually
 tune, and deep system/security info — all read live from your machine, nothing hardcoded.
 
+<div align="center">
+
+### 💖 Free forever — powered by people like you
+
+No paywall, no ads, no telemetry. If Process Hammer earns a spot in your toolkit,
+a small tip keeps development going. **Thank you!** 🙏
+
+<a href="https://ko-fi.com/hammerpower">
+  <img src="https://img.shields.io/badge/%E2%9D%A4%20Buy%20me%20a-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Support Process Hammer on Ko-fi" height="42">
+</a>
+
+</div>
+
 > 📸 **Screenshots go here.** Drop a couple of PNGs and a short GIF into `docs/screenshots/` and
 > embed them at the top before sharing.
 
@@ -161,16 +174,6 @@ running the app, not by unit tests.
 
 Code signing (to drop the SmartScreen warning) · per-process GPU % · left-sidebar navigation ·
 localization.
-
-## 💖 Support development
-
-Process Hammer is free and always will be — no paywall, no telemetry. If it's useful to you and
-you'd like to help fund development, you can leave a tip:
-
-[![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-support%20development-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/hammerpower)
-
-Tips are entirely optional gifts, not a purchase — they don't unlock features or change the
-**"as is", no-warranty** terms below. Thank you for the support! 🙏
 
 ## 🤝 Contributing
 
