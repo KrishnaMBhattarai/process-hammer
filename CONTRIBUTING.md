@@ -1,4 +1,4 @@
-# Contributing to Process Booster
+# Contributing to Process Hammer
 
 Thanks for your interest! This is a young project and help is very welcome — especially **testing on
 different hardware**, **new system-info collectors**, and **UI polish**.
@@ -10,8 +10,8 @@ different hardware**, **new system-info collectors**, and **UI polish**.
 - Any editor (Visual Studio 2022, VS Code + C# Dev Kit, or Rider).
 
 ```powershell
-git clone https://github.com/KrishnaMBhattarai/process-booster.git
-cd process-booster
+git clone https://github.com/KrishnaMBhattarai/process-hammer.git
+cd process-hammer
 dotnet build -c Release
 dotnet test  -c Release        # must stay green
 ./publish.ps1                  # optional: build the distributables
@@ -22,19 +22,19 @@ Run the app elevated (it self-elevates via its manifest; accept the UAC prompt).
 ## Project layout
 
 ```
-src/ProcessBooster.Core   process-control logic + interop; NO UI; unit-tested
-src/ProcessBooster.App    WPF app
+src/ProcessHammer.Core   process-control logic + interop; NO UI; unit-tested
+src/ProcessHammer.App    WPF app
     Hardware/             system-info collectors (one file per area)
     ViewModels/           MVVM view-models (MainViewModel, tabs, etc.)
     Behaviors/            small attached behaviors (e.g. dynamic DataGrid columns)
     MainWindow.xaml       the shell + tab layout
-tests/ProcessBooster.Tests  xUnit
+tests/ProcessHammer.Tests  xUnit
 docs/                     architecture + native-API reference
 ```
 
 ## How to add a new system-info tab (the most common contribution)
 
-1. **Collector** — add `src/ProcessBooster.App/Hardware/XxxInfo.cs`:
+1. **Collector** — add `src/ProcessHammer.App/Hardware/XxxInfo.cs`:
    ```csharp
    public static class XxxInfoService
    {

@@ -1,24 +1,24 @@
-# ⚡ Process Booster
+# ⚡ Process Hammer
 
 **See everything about your Windows PC — and take control of it.** A free, open-source system
-dashboard *and* process tuner in one fast, modern app. No nag screens, no paywall, no install:
+dashboard *and* per-process tuner in one fast, modern app. No paywall, no telemetry, no install —
 just one portable `.exe`.
 
 ![License](https://img.shields.io/badge/license-MIT-blue) ![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078D6) ![.NET](https://img.shields.io/badge/.NET-8-512BD4) ![Portable](https://img.shields.io/badge/single%20exe-no%20install-brightgreen)
 
-If you've ever paid for **Process Lasso** just to pin a game to your P-cores, or juggled **Speccy +
-HWiNFO + Autoruns + Task Manager** to check your rig — this is all of that, free and in one window.
+One window instead of a pile of utilities: live hardware readouts, a process table you can actually
+tune, and deep system/security info — all read live from your machine, nothing hardcoded.
 
-> 📸 **Screenshots go here.** *(This is the #1 thing before sharing — drop a couple of PNGs and a
-> short GIF into `docs/screenshots/` and they'll be embedded at the top.)*
+> 📸 **Screenshots go here.** Drop a couple of PNGs and a short GIF into `docs/screenshots/` and
+> embed them at the top before sharing.
 
 ---
 
 ## 🎮 Built for gamers & PC builders
 
-- **Tune games for smoother frames.** Set a game to **High priority**, pin it to your **P-cores**,
-  turn **efficiency mode off**, and force the **high-performance GPU** — then **save it as a rule**
-  so it's applied automatically every time that game launches.
+- **Tune games for smoother frames.** Set a process to **High priority**, pin it to your **P-cores**,
+  turn **efficiency mode off**, and force the **high-performance GPU** — then **Apply** so it's saved
+  as a rule and re-applied automatically every time that app launches.
 - **Know your rig cold.** Per-core **P/E layout with live clocks**, **RAM speed + timings + part
   numbers**, **true VRAM** (not the WMI 4 GB lie), monitor **connection (HDMI/DP) + HDR**, disk
   **health**, and **live temps / fans / voltages** on the Sensors tab.
@@ -30,42 +30,57 @@ HWiNFO + Autoruns + Task Manager** to check your rig — this is all of that, fr
 
 ---
 
+## ⚠️ A note on protected processes
+
+Some processes can be **read but not modified by any user-mode tool** — most online games with
+**anti-cheat**, and core Windows/system processes. Windows denies the write even to an administrator.
+For those, per-process settings (priority, affinity, I/O, memory, …) will report **Failed (access
+denied)**, and Process Hammer tells you so with a red popup instead of silently doing nothing.
+
+What still works on a protected app:
+
+- **GPU preference** → *High performance* — a per-app registry setting; takes effect the next time the
+  app launches.
+- **Power plan** → *High performance* — system-wide.
+- Free up resources for it indirectly by lowering the **priority** or turning on **efficiency mode**
+  for *other* background apps (those aren't protected).
+
+This is a Windows limitation, not a bug — no user-mode program can get around it.
+
+---
+
 ## 📥 Download
 
-1. Grab **`ProcessBooster_SelfContained_vX.Y.Z.exe`** from the
-   **[Releases page](https://github.com/KrishnaMBhattarai/process-booster/releases/latest)**.
+1. Grab **`ProcessHammer_SelfContained_vX.Y.Z.exe`** from the
+   **[Releases page](https://github.com/KrishnaMBhattarai/process-hammer/releases/latest)**.
    *(Portable single file, ~72 MB — bundles .NET, so **nothing else to install**.)*
-2. Double-click it and accept the **UAC prompt** (admin is required to read/change processes).
+2. Double-click it and accept the **UAC prompt** (admin is required to read/change other processes).
 
 ### ✅ Verify your download (SHA-256)
 
-Every release ships a matching `.sha256` file. Check your download hasn't been tampered with:
+Every release ships a matching `.sha256` file. Confirm your download wasn't tampered with:
 
 ```powershell
-# PowerShell — should match the hash in the .sha256 file on the release
-Get-FileHash .\ProcessBooster_SelfContained_v0.14.0.exe -Algorithm SHA256
-```
-```cmd
-:: or with certutil
-certutil -hashfile ProcessBooster_SelfContained_v0.14.0.exe SHA256
+# PowerShell — compare against the hash in the .sha256 file on the release
+Get-FileHash .\ProcessHammer_SelfContained_vX.Y.Z.exe -Algorithm SHA256
 ```
 
-Compare the output to the hash inside `ProcessBooster_SelfContained_vX.Y.Z.exe.sha256`. If they
-match, the file is authentic and unmodified.
+If the hash matches the one inside `ProcessHammer_SelfContained_vX.Y.Z.exe.sha256`, the file is
+authentic and unmodified.
 
 ### ⚠️ SmartScreen / antivirus
 
 The exe isn't code-signed yet, so **SmartScreen may warn** — click **More info → Run anyway**. The
-live **Sensors** tab loads a kernel driver (`WinRing0`, the same one HWiNFO / LibreHardwareMonitor
-use) to read temperatures, which some antivirus flags; if it's blocked, sensors show `—` and
-everything else still works. Prefer to be safe? **Build it yourself** (below).
+live **Sensors** tab loads the open-source **LibreHardwareMonitor** driver to read temperatures, which
+some antivirus flags; if it's blocked, sensors show `—` and everything else still works. Prefer to be
+safe? **Build it yourself** (below).
 
 ---
 
 ## 🧰 What's inside
 
-**Processes** — a live, sortable table (CPU %, priority, affinity, I/O, memory, threads, RAM,
-active rules). Right-click any process for a full Process-Lasso-style menu:
+**Processes** — a live, sortable table (CPU %, priority, affinity, I/O, memory, threads, RAM, active
+rules). Right-click any process for the full tuning menu:
 
 - **CPU priority** (Idle → Realtime)
 - **CPU affinity** — a checkbox per logical core, plus **All / P-core / E-core** presets (a *hard*
@@ -73,23 +88,21 @@ active rules). Right-click any process for a full Process-Lasso-style menu:
 - **CPU sets** — the *soft* version of affinity (prefer these cores, but Windows may still use others)
 - **I/O priority**, **Memory priority**, **GPU priority**, **GPU preference**, **Efficiency mode
   (EcoQoS)**, **Priority boost**
-- **Power profile** (switch the active Windows power plan)
+- **Power plan** (switch the active Windows power scheme)
 - **Trim memory**, **Copy rule**, **Remove rule**, and **Restart / Restart as admin / Close / Terminate**
 
-Every option shows a **checkmark on what's currently applied** and moves as you change it. The
-right-hand **Rule** panel is a **live mirror** of that same state — it opens **pre-filled with the
-process's current settings**, and changing a setting in either place updates the other. Hit **Apply**
-to keep those settings enforced: they're saved as a rule and re-applied automatically, including when
-the game relaunches. (Remove a rule via right-click → **Remove saved rule**.) Live activity log;
-import/export rules as JSON.
+Every option shows a **checkmark on what's currently applied**. The right-hand **Rule** panel is a
+**live mirror** of the same state — change a setting in either place and the other updates instantly.
+Hit **Apply** to keep those settings enforced: they're saved as a rule and re-applied automatically,
+including when the app relaunches. Live activity log; import/export rules as JSON.
 
-**Booster Rules** — every saved rule in one place, showing exactly what it applies (priority, cores,
-I/O, memory, eco, boost, CPU sets, GPU) and whether its process is running. Apply, enable/disable or
-remove rules here, next to a built-in **reference guide** that explains what each setting does.
+**Rules** — every saved rule in one place, showing exactly what it applies (priority, cores, I/O,
+memory, eco, boost, CPU sets, GPU) and whether its process is running. Apply, enable/disable or remove
+rules here, next to a built-in **reference guide** explaining what each setting does.
 
-**Runs in the tray** — closing the window keeps Process Booster running in the system tray so your
-rules stay enforced. Right-click the tray icon to **Show** it, toggle **Start with Windows** (a
-logon task with highest privileges, so it starts elevated with no UAC nag), or **Exit**.
+**Runs in the tray** — closing the window keeps Process Hammer running in the system tray so your
+rules stay enforced. Right-click the tray icon to **Show** it, toggle **Start with Windows** (a logon
+task with highest privileges, so it starts elevated with no UAC prompt), or **Exit**.
 
 **Info tabs:**
 
@@ -109,7 +122,7 @@ Everything is enumerated from the live system — **nothing is hardcoded**, so i
 
 ## 💻 Requirements
 
-64-bit **Windows 10 (1809+) or 11**. Administrator rights (one UAC prompt).
+64-bit **Windows 10 (1809+) or 11**. Administrator rights (one UAC prompt) to read/change processes.
 
 ## 🛠️ Build from source
 
@@ -117,29 +130,32 @@ Requires the **.NET 8 SDK**.
 
 ```powershell
 dotnet build -c Release
-dotnet test  -c Release     # 155 tests (see "Testing" below)
-./publish.ps1               # builds both distributables + the versioned exe & SHA-256
+dotnet test  -c Release     # 167 tests (see "Testing" below)
+./publish.ps1               # builds both distributables into .\dist\ (+ versioned exe & SHA-256)
 ```
+
+`publish.ps1` writes everything to a `dist\` folder in the repo (gitignored): a runtime-dependent
+folder build and a self-contained single-file exe, plus its `.sha256`.
 
 ### ✅ Testing
 
-**155 tests**, run on Windows. They cover:
+**167 tests**, run on Windows:
 
 - **Pure logic** — affinity-mask parsing (whitespace, ranges, out-of-range), P/E-core presets, rule
-  matching & normalization, config serialization/round-trips, and the view-model state that drives
-  the menus and the Rule editor. Core logic sits at **~89% line coverage**.
-- **Functional read-back** — every boosting action (CPU priority, affinity, CPU sets, I/O, memory,
-  GPU priority, GPU preference, efficiency, priority boost, trim, power plan, terminate) is applied
-  to a real process and then **read back** to prove it actually took effect — not just that a call
-  returned. State is always restored afterwards.
+  matching & normalization, config serialization/round-trips, and the view-model state that keeps the
+  menu and the Rule panel in sync. Core logic sits at **~89% line coverage**.
+- **Functional read-back** — every action (CPU priority, affinity, CPU sets, I/O, memory, GPU
+  priority, GPU preference, efficiency, priority boost, trim, power plan, terminate) is applied to a
+  real process and then **read back** to prove it took effect — not just that a call returned. State
+  is always restored afterwards.
 
-The remainder of the code is UI (XAML), live process enumeration, and WMI/sensor hardware readers,
-which are exercised by using the app rather than by unit tests.
+The rest is UI (XAML), live process enumeration, and WMI/sensor hardware readers — exercised by
+running the app, not by unit tests.
 
 ## 🗺️ Roadmap
 
-Auto-start at logon · optional tray icon · code signing (to drop the SmartScreen warning) ·
-left-sidebar navigation · per-process GPU usage.
+Code signing (to drop the SmartScreen warning) · per-process GPU % · left-sidebar navigation ·
+localization.
 
 ## 🤝 Contributing
 

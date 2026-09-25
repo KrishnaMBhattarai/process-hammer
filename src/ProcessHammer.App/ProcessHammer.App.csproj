@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>ProcessHammer.App</RootNamespace>
+    <AssemblyName>ProcessHammer</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- WinForms is only used by TrayIcon.cs (which imports it explicitly). Keep its global usings out
+       so System.Windows.Forms doesn't clash with WPF's Application/MessageBox/Color elsewhere. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WPF-UI" Version="3.0.5" />
+    <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ProcessHammer.Core\ProcessHammer.Core.csproj" />
+  </ItemGroup>
+
+</Project>
