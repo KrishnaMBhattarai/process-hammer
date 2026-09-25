@@ -119,6 +119,46 @@ public class RuleEditorViewModelTests
     }
 
     [Fact]
+    public void SettingChanged_FiresOnUserEdit_NotOnProgrammaticLoad()
+    {
+        var vm = NewEditor();
+        var fires = 0;
+        vm.SettingChangedByUser += _ => fires++;
+
+        vm.LoadFrom(null, new CurrentState(CpuPriority.High, null, null, null, null, null));
+        Assert.Equal(0, fires); // a programmatic load must NOT trigger a live re-apply
+
+        vm.SelectedCpuPriority = vm.CpuPriorityOptions.First(o => (CpuPriority?)o.Value == CpuPriority.Idle);
+        Assert.Equal(1, fires); // a user change does
+    }
+
+    [Fact]
+    public void SettingChanged_ReportsTheChangedField()
+    {
+        var vm = NewEditor();
+        RuleEditorViewModel.EditorSetting? last = null;
+        vm.SettingChangedByUser += f => last = f;
+
+        vm.SelectedIo = vm.IoOptions.First(o => (IoPriority?)o.Value == IoPriority.Low);
+        Assert.Equal(RuleEditorViewModel.EditorSetting.Io, last);
+
+        vm.SelectedMemory = vm.MemoryOptions.First(o => (MemoryPriority?)o.Value == MemoryPriority.Low);
+        Assert.Equal(RuleEditorViewModel.EditorSetting.Memory, last);
+    }
+
+    [Fact]
+    public void AffinityCheckbox_Toggle_FiresAffinityChange()
+    {
+        var vm = NewEditor();
+        vm.AffinityPresetCommand.Execute("all");
+        RuleEditorViewModel.EditorSetting? last = null;
+        vm.SettingChangedByUser += f => last = f;
+
+        vm.AffinityCores[1].IsChecked = false;
+        Assert.Equal(RuleEditorViewModel.EditorSetting.Affinity, last);
+    }
+
+    [Fact]
     public void UncheckingACore_UpdatesAffinityText()
     {
         var vm = NewEditor();
