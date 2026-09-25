@@ -3,6 +3,8 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- The App project is WPF; tests exercise its view-model logic only (no windows are shown). -->
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ProcessBooster.Core\ProcessBooster.Core.csproj" />
+    <ProjectReference Include="..\..\src\ProcessBooster.App\ProcessBooster.App.csproj" />
   </ItemGroup>
 
 </Project>

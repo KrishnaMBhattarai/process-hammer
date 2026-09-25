@@ -21,6 +21,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly ProcessInspector _inspector;
     private readonly ProcessController _controller;
     private readonly PowerService _power;
+    private readonly CpuTopology _topology;
     private readonly RuleEngine _engine;
     private readonly ActionLog _log;
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
@@ -42,8 +43,16 @@ public sealed class MainViewModel : ViewModelBase
     public ObservableCollection<AffinityCoreItem> AffinityCores { get; } = new();
     public ObservableCollection<PowerProfileItem> PowerProfiles { get; } = new();
 
+    // Checkable submenus that reflect the selected process's current settings.
+    public ObservableCollection<MenuOptionItem> CpuPriorityMenu { get; } = new();
+    public ObservableCollection<MenuOptionItem> IoMenu { get; } = new();
+    public ObservableCollection<MenuOptionItem> MemoryMenu { get; } = new();
+    public ObservableCollection<MenuOptionItem> EfficiencyMenu { get; } = new();
+    public ObservableCollection<MenuOptionItem> BoostMenu { get; } = new();
+
     // Booster Rules tab.
     public ObservableCollection<RuleRowViewModel> BoosterRules { get; } = new();
+    public bool HasNoBoosterRules => BoosterRules.Count == 0;
     private RuleRowViewModel? _selectedRule;
     public RuleRowViewModel? SelectedRule
     {
@@ -89,6 +98,7 @@ public sealed class MainViewModel : ViewModelBase
     public RelayCommand QuickGpuPreferenceCommand { get; }
     public RelayCommand QuickBoostCommand { get; }
     public RelayCommand QuickCpuSetCommand { get; }
+    public RelayCommand AffinityPresetCommand { get; }
     public RelayCommand TrimMemoryCommand { get; }
     public RelayCommand CopyRuleCommand { get; }
     public RelayCommand RestartProcessCommand { get; }
@@ -108,6 +118,7 @@ public sealed class MainViewModel : ViewModelBase
     {
         _config = config; _store = store; _inspector = inspector;
         _controller = controller; _engine = engine; _log = log; _monitor = monitor; _power = power;
+        _topology = topology;
 
         Editor = new RuleEditorViewModel(topology);
 
@@ -218,6 +229,7 @@ public sealed class MainViewModel : ViewModelBase
         QuickGpuPreferenceCommand = new RelayCommand(QuickGpuPreference);
         QuickBoostCommand = new RelayCommand(QuickBoost);
         QuickCpuSetCommand = new RelayCommand(QuickCpuSet);
+        AffinityPresetCommand = new RelayCommand(ApplyAffinityPreset);
         TrimMemoryCommand = new RelayCommand(_ => TrimMemory());
         CopyRuleCommand = new RelayCommand(_ => CopyRule());
         RestartProcessCommand = new RelayCommand(_ => RestartProcess(asAdmin: false));
@@ -229,6 +241,15 @@ public sealed class MainViewModel : ViewModelBase
         ToggleRuleEnabledCommand = new RelayCommand(_ => ToggleRuleEnabled(), _ => SelectedRule is not null);
         RemoveSelectedRuleCommand = new RelayCommand(_ => RemoveSelectedRule(), _ => SelectedRule is not null);
         RemoveAllRulesCommand = new RelayCommand(_ => RemoveAllRules(), _ => _config.Rules.Count > 0);
+
+        // Checkable submenus (a tick marks the value currently applied to the selected process).
+        foreach (CpuPriority v in Enum.GetValues<CpuPriority>()) CpuPriorityMenu.Add(MenuItem(Humanize(v.ToString()), v, QuickPriority));
+        foreach (IoPriority v in Enum.GetValues<IoPriority>()) IoMenu.Add(MenuItem(Humanize(v.ToString()), v, QuickIo));
+        foreach (MemoryPriority v in Enum.GetValues<MemoryPriority>()) MemoryMenu.Add(MenuItem(Humanize(v.ToString()), v, QuickMemory));
+        EfficiencyMenu.Add(MenuItem("On (EcoQoS)", true, QuickEfficiency));
+        EfficiencyMenu.Add(MenuItem("Off (system-managed)", false, QuickEfficiency));
+        BoostMenu.Add(MenuItem("Enabled", true, QuickBoostEnabled));   // Value = "boost enabled?" for the checkmark
+        BoostMenu.Add(MenuItem("Disabled", false, QuickBoostEnabled));
 
         // One checkbox per logical CPU for the right-click affinity list.
         for (var i = 0; i < _cpuCount; i++)
@@ -322,12 +343,13 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (!SetField(ref _selected, value)) return;
             RefreshAffinityCores(value?.AffinityMaskRaw);
+            RefreshMenuChecks();
             if (value is null) Editor.Clear();
             else
             {
                 var pid = value.Pid; var name = value.Name;
                 Editor.SetTarget(name, pid, value.ExePath);
-                Editor.LoadFrom(FindRule(name));
+                Editor.LoadFrom(FindRule(name), CurrentOf(value));
 
                 // Resolve the exe path lazily off-thread (needed for GPU preference) so selection is instant.
                 if (value.ExePath is null)
@@ -493,8 +515,48 @@ public sealed class MainViewModel : ViewModelBase
         if (SelectedProcess is { } p && param is CpuSetSelection sel) Act(p, _controller.SetCpuSets(p.Pid, sel, null));
     }
 
+    private void QuickBoostEnabled(object? param)
+    {
+        if (SelectedProcess is not { } p) return;
+        var enabled = param is bool b && b;
+        Act(p, _controller.SetPriorityBoostDisabled(p.Pid, disabled: !enabled));
+    }
+
+    /// <summary>Wrap an apply action so the menu checkmarks refresh right after it runs.</summary>
+    private MenuOptionItem MenuItem(string label, object? value, Action<object?> apply) =>
+        new(label, value, o => { apply(o); RefreshMenuChecks(); });
+
+    /// <summary>Tick the menu item matching each current setting on the selected process.</summary>
+    private void RefreshMenuChecks()
+    {
+        var p = SelectedProcess;
+        SetChecks(CpuPriorityMenu, p?.CpuPriorityRaw);
+        SetChecks(IoMenu, p?.IoRaw);
+        SetChecks(MemoryMenu, p?.MemoryRaw);
+        SetChecks(EfficiencyMenu, p?.EcoRaw);
+        SetChecks(BoostMenu, p?.BoostEnabledRaw);
+    }
+
+    private static void SetChecks(IEnumerable<MenuOptionItem> items, object? current)
+    {
+        foreach (var it in items) it.IsChecked = current is not null && Equals(it.Value, current);
+    }
+
+    /// <summary>"BelowNormal" → "Below normal", "VeryLow" → "Very low".</summary>
+    private static string Humanize(string pascal)
+    {
+        var sb = new System.Text.StringBuilder(pascal.Length + 4);
+        for (var i = 0; i < pascal.Length; i++)
+        {
+            var ch = pascal[i];
+            if (i > 0 && char.IsUpper(ch)) { sb.Append(' '); sb.Append(char.ToLower(ch)); }
+            else sb.Append(ch);
+        }
+        return sb.ToString();
+    }
+
     // ---- CPU affinity checkbox list ----
-    private ulong AllCoresMask() => _cpuCount >= 64 ? ulong.MaxValue : (1UL << _cpuCount) - 1;
+    private ulong AllCoresMask() => AffinityPresets.AllMask(_cpuCount);
 
     /// <summary>Rebuild the affinity checkboxes from a process's current mask, without triggering an apply.</summary>
     private void RefreshAffinityCores(ulong? mask)
@@ -515,6 +577,24 @@ public sealed class MainViewModel : ViewModelBase
         foreach (var c in AffinityCores) if (c.IsChecked) mask |= 1UL << c.Index;
         if (mask == 0) mask = AllCoresMask(); // unchecking everything = all cores
         Act(p, _controller.SetAffinity(p.Pid, mask));
+    }
+
+    private ulong CoreClassMask(bool performance) => AffinityPresets.ClassMask(_topology.Sets, performance, _cpuCount);
+
+    /// <summary>Right-click affinity presets: "all" (P+E), "p" (performance cores), "e" (efficiency cores).</summary>
+    private void ApplyAffinityPreset(object? param)
+    {
+        if (SelectedProcess is not { } p) return;
+        var which = param?.ToString();
+        var mask = which switch
+        {
+            "p" => CoreClassMask(performance: true),
+            "e" => CoreClassMask(performance: false),
+            _ => AllCoresMask(),
+        };
+        if (which == "e" && !_topology.IsHybrid) { _log.Warn($"{p.Name}: no separate efficiency cores on this CPU."); return; }
+        Act(p, _controller.SetAffinity(p.Pid, mask));
+        RefreshAffinityCores(mask); // reflect the preset in the checkboxes
     }
 
     // ---- lifecycle actions ----
@@ -568,6 +648,7 @@ public sealed class MainViewModel : ViewModelBase
             BoosterRules.Add(new RuleRowViewModel(r));
         UpdateRulesRunning();
         RemoveAllRulesCommand.RaiseCanExecuteChanged();
+        Raise(nameof(HasNoBoosterRules));
         Raise(nameof(RuleCount));
         Raise(nameof(StatusText));
     }
@@ -651,7 +732,7 @@ public sealed class MainViewModel : ViewModelBase
         if (SelectedProcess is not { } p) return;
         var removed = _config.Rules.RemoveAll(r => r.NormalizedMatch == ProcessRule.Normalize(p.Name));
         if (removed > 0) _log.Info($"Removed rule for {p.Name}.");
-        Editor.LoadFrom(null);
+        Editor.LoadFrom(null, CurrentOf(p)); // keep showing the process's live state
         Persist();
         RebuildBoosterRules();
         RaiseCommands();
@@ -717,6 +798,10 @@ public sealed class MainViewModel : ViewModelBase
         return r.Name.Contains(_search, StringComparison.OrdinalIgnoreCase)
             || r.Pid.ToString().Contains(_search);
     }
+
+    /// <summary>Snapshot a process row's live settings for the editor's "show current state" pre-select.</summary>
+    private static CurrentState CurrentOf(ProcessRowViewModel p) =>
+        new(p.CpuPriorityRaw, p.AffinityMaskRaw, p.IoRaw, p.MemoryRaw, p.EcoRaw, p.BoostEnabledRaw);
 
     private ProcessRule? FindRule(string name) =>
         _config.Rules.FirstOrDefault(r => r.NormalizedMatch == ProcessRule.Normalize(name));

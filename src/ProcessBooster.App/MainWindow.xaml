@@ -71,6 +71,33 @@
             </Setter>
         </Style>
 
+        <!-- Checkable option in a right-click submenu; tick reflects the value applied now. -->
+        <Style x:Key="OptionMenuItem" TargetType="MenuItem">
+            <Setter Property="Header" Value="{Binding Label}" />
+            <Setter Property="IsCheckable" Value="True" />
+            <Setter Property="IsChecked" Value="{Binding IsChecked, Mode=OneWay}" />
+            <Setter Property="Command" Value="{Binding Command}" />
+        </Style>
+
+        <!-- One logical-CPU checkbox in the affinity list; stays open so several can be toggled. -->
+        <Style x:Key="CoreMenuItem" TargetType="MenuItem">
+            <Setter Property="Header" Value="{Binding Label}" />
+            <Setter Property="IsCheckable" Value="True" />
+            <Setter Property="StaysOpenOnClick" Value="True" />
+            <Setter Property="IsChecked" Value="{Binding IsChecked, Mode=TwoWay}" />
+        </Style>
+
+        <!-- Reference-guide text on the Booster Rules tab. -->
+        <Style x:Key="RefName" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,12,0,2" />
+        </Style>
+        <Style x:Key="RefBody" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Opacity" Value="0.8" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+
         <!-- Shared layout for every hardware tab: note + live tiles + detail cards -->
         <DataTemplate DataType="{x:Type vm:HardwareTabViewModel}">
             <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8,12,8,8">
@@ -332,41 +359,23 @@
                                 </DataGrid.RowStyle>
                                 <DataGrid.ContextMenu>
                                     <ContextMenu>
-                                        <MenuItem Header="CPU priority">
-                                            <MenuItem Header="Idle" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.Idle}" />
-                                            <MenuItem Header="Below normal" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.BelowNormal}" />
-                                            <MenuItem Header="Normal" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.Normal}" />
-                                            <MenuItem Header="Above normal" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.AboveNormal}" />
-                                            <MenuItem Header="High" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.High}" />
-                                            <MenuItem Header="Realtime" Command="{Binding QuickPriorityCommand}" CommandParameter="{x:Static core:CpuPriority.Realtime}" />
+                                        <MenuItem Header="CPU priority" ItemsSource="{Binding CpuPriorityMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}" />
+                                        <MenuItem Header="CPU affinity — hard limit"
+                                                  ToolTip="Strict: the process can ONLY run on the ticked cores. Best for firmly pinning a game to Performance cores.">
+                                            <MenuItem Header="All cores (P + E)" Command="{Binding AffinityPresetCommand}" CommandParameter="all" />
+                                            <MenuItem Header="Performance cores (P)" Command="{Binding AffinityPresetCommand}" CommandParameter="p" />
+                                            <MenuItem Header="Efficiency cores (E)" Command="{Binding AffinityPresetCommand}" CommandParameter="e" />
+                                            <Separator />
+                                            <MenuItem Header="Choose cores…" ItemsSource="{Binding AffinityCores}" ItemContainerStyle="{StaticResource CoreMenuItem}" />
                                         </MenuItem>
-                                        <MenuItem Header="CPU affinity" ItemsSource="{Binding AffinityCores}">
-                                            <MenuItem.ItemContainerStyle>
-                                                <Style TargetType="MenuItem">
-                                                    <Setter Property="Header" Value="{Binding Label}" />
-                                                    <Setter Property="IsCheckable" Value="True" />
-                                                    <Setter Property="StaysOpenOnClick" Value="True" />
-                                                    <Setter Property="IsChecked" Value="{Binding IsChecked, Mode=TwoWay}" />
-                                                </Style>
-                                            </MenuItem.ItemContainerStyle>
-                                        </MenuItem>
-                                        <MenuItem Header="CPU sets">
+                                        <MenuItem Header="CPU sets — preferred cores"
+                                                  ToolTip="Softer: asks Windows to favor these cores but still allow others when needed (the mechanism Game Mode uses).">
                                             <MenuItem Header="All cores" Command="{Binding QuickCpuSetCommand}" CommandParameter="{x:Static core:CpuSetSelection.All}" />
                                             <MenuItem Header="Performance cores" Command="{Binding QuickCpuSetCommand}" CommandParameter="{x:Static core:CpuSetSelection.PerformanceCores}" />
                                             <MenuItem Header="Efficiency cores" Command="{Binding QuickCpuSetCommand}" CommandParameter="{x:Static core:CpuSetSelection.EfficiencyCores}" />
                                         </MenuItem>
-                                        <MenuItem Header="I/O priority">
-                                            <MenuItem Header="Very low" Command="{Binding QuickIoCommand}" CommandParameter="{x:Static core:IoPriority.VeryLow}" />
-                                            <MenuItem Header="Low" Command="{Binding QuickIoCommand}" CommandParameter="{x:Static core:IoPriority.Low}" />
-                                            <MenuItem Header="Normal" Command="{Binding QuickIoCommand}" CommandParameter="{x:Static core:IoPriority.Normal}" />
-                                        </MenuItem>
-                                        <MenuItem Header="Memory priority">
-                                            <MenuItem Header="Very low" Command="{Binding QuickMemoryCommand}" CommandParameter="{x:Static core:MemoryPriority.VeryLow}" />
-                                            <MenuItem Header="Low" Command="{Binding QuickMemoryCommand}" CommandParameter="{x:Static core:MemoryPriority.Low}" />
-                                            <MenuItem Header="Medium" Command="{Binding QuickMemoryCommand}" CommandParameter="{x:Static core:MemoryPriority.Medium}" />
-                                            <MenuItem Header="Below normal" Command="{Binding QuickMemoryCommand}" CommandParameter="{x:Static core:MemoryPriority.BelowNormal}" />
-                                            <MenuItem Header="Normal" Command="{Binding QuickMemoryCommand}" CommandParameter="{x:Static core:MemoryPriority.Normal}" />
-                                        </MenuItem>
+                                        <MenuItem Header="I/O priority" ItemsSource="{Binding IoMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}" />
+                                        <MenuItem Header="Memory priority" ItemsSource="{Binding MemoryMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}" />
                                         <MenuItem Header="GPU priority">
                                             <MenuItem Header="Idle" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.Idle}" />
                                             <MenuItem Header="Below normal" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.BelowNormal}" />
@@ -380,14 +389,8 @@
                                             <MenuItem Header="Power saving" Command="{Binding QuickGpuPreferenceCommand}" CommandParameter="{x:Static core:GpuPreference.PowerSaving}" />
                                             <MenuItem Header="High performance" Command="{Binding QuickGpuPreferenceCommand}" CommandParameter="{x:Static core:GpuPreference.HighPerformance}" />
                                         </MenuItem>
-                                        <MenuItem Header="Efficiency mode">
-                                            <MenuItem Header="On (EcoQoS)" Command="{Binding QuickEfficiencyCommand}" CommandParameter="True" />
-                                            <MenuItem Header="Off (system-managed)" Command="{Binding QuickEfficiencyCommand}" CommandParameter="False" />
-                                        </MenuItem>
-                                        <MenuItem Header="Priority boost">
-                                            <MenuItem Header="Enabled" Command="{Binding QuickBoostCommand}" CommandParameter="False" />
-                                            <MenuItem Header="Disabled" Command="{Binding QuickBoostCommand}" CommandParameter="True" />
-                                        </MenuItem>
+                                        <MenuItem Header="Efficiency mode" ItemsSource="{Binding EfficiencyMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}" />
+                                        <MenuItem Header="Priority boost" ItemsSource="{Binding BoostMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}" />
                                         <MenuItem Header="Power profile" ItemsSource="{Binding PowerProfiles}">
                                             <MenuItem.ItemContainerStyle>
                                                 <Style TargetType="MenuItem">
@@ -420,7 +423,7 @@
                                     <DataGridTextColumn Header="Eco" Binding="{Binding Eco}" Width="0.5*" />
                                     <DataGridTextColumn Header="Threads" Binding="{Binding Threads}" Width="0.7*" SortMemberPath="Threads" />
                                     <DataGridTextColumn Header="RAM" Binding="{Binding WorkingSet}" Width="0.9*" />
-                                    <DataGridTextColumn Header="Rule" Binding="{Binding Rule}" Width="1.1*" />
+                                    <DataGridTextColumn Header="Rules" Binding="{Binding Rule}" Width="1.1*" />
                                 </DataGrid.Columns>
                             </DataGrid>
                         </ui:Card>
@@ -435,8 +438,25 @@
                                             <StackPanel IsEnabled="{Binding Editor.HasTarget}">
                                                 <TextBlock Text="CPU priority" Style="{StaticResource FieldLabel}" />
                                                 <ComboBox ItemsSource="{Binding Editor.CpuPriorityOptions}" SelectedItem="{Binding Editor.SelectedCpuPriority, Mode=TwoWay}" />
-                                                <TextBlock Text="CPU affinity (e.g. 0-7,16 — blank = all)" Style="{StaticResource FieldLabel}" />
-                                                <ui:TextBox Text="{Binding Editor.AffinityText, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="all cores" />
+                                                <TextBlock Text="CPU affinity (tick the cores to allow — all ticked = no limit)" Style="{StaticResource FieldLabel}" />
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                                    <ui:Button Content="All (P+E)" Command="{Binding Editor.AffinityPresetCommand}" CommandParameter="all" Padding="8,2" Margin="0,0,6,0" />
+                                                    <ui:Button Content="P-cores" Command="{Binding Editor.AffinityPresetCommand}" CommandParameter="p" Padding="8,2" Margin="0,0,6,0" />
+                                                    <ui:Button Content="E-cores" Command="{Binding Editor.AffinityPresetCommand}" CommandParameter="e" Padding="8,2" />
+                                                </StackPanel>
+                                                <Border BorderBrush="#33FFFFFF" BorderThickness="1" CornerRadius="6" Padding="8">
+                                                    <ItemsControl ItemsSource="{Binding Editor.AffinityCores}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <CheckBox Content="{Binding Index}" IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                                                          MinWidth="42" Margin="2" />
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Border>
                                                 <TextBlock Text="I/O priority" Style="{StaticResource FieldLabel}" />
                                                 <ComboBox ItemsSource="{Binding Editor.IoOptions}" SelectedItem="{Binding Editor.SelectedIo, Mode=TwoWay}" />
                                                 <TextBlock Text="Memory priority" Style="{StaticResource FieldLabel}" />
@@ -510,8 +530,16 @@
                         </StackPanel>
                     </Grid>
 
-                    <ui:Card Grid.Row="1" Padding="0">
-                        <DataGrid ItemsSource="{Binding BoosterRules}"
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="380" />
+                        </Grid.ColumnDefinitions>
+
+                        <ui:Card Grid.Column="0" Padding="0">
+                          <Grid>
+                            <DataGrid ItemsSource="{Binding BoosterRules}"
                                   SelectedItem="{Binding SelectedRule, Mode=TwoWay}"
                                   AutoGenerateColumns="False" IsReadOnly="True"
                                   HeadersVisibility="Column" GridLinesVisibility="None"
@@ -562,8 +590,53 @@
                                 <DataGridTextColumn Header="Power plan" Binding="{Binding PowerPlan}" Width="1*" />
                                 <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="1.2*" />
                             </DataGrid.Columns>
-                        </DataGrid>
-                    </ui:Card>
+                            </DataGrid>
+                            <TextBlock Text="No booster rules yet. In the Processes tab, select a process, choose settings in the Rule panel and click Save rule — it will show up here."
+                                       Visibility="{Binding HasNoBoosterRules, Converter={StaticResource BoolToVis}}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                                       TextWrapping="Wrap" MaxWidth="440" Opacity="0.6" FontSize="14" IsHitTestVisible="False" />
+                          </Grid>
+                        </ui:Card>
+
+                        <ui:Card Grid.Column="2" Padding="0">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                                <StackPanel>
+                                    <TextBlock Text="Reference — what each setting does" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,4" />
+                                    <TextBlock Style="{StaticResource RefBody}" Text="A quick guide to the options you set per rule and in the right-click menu." />
+
+                                    <TextBlock Style="{StaticResource RefName}" Text="CPU priority" />
+                                    <TextBlock Style="{StaticResource RefBody}" Text="Share of CPU time vs other processes. Idle / Below normal yield to foreground apps; Above normal / High push this one ahead. Realtime can starve Windows itself — use sparingly." />
+
+                                    <TextBlock Style="{StaticResource RefName}" Text="CPU affinity — hard limit" />
+                                    <TextBlock Style="{StaticResource RefBody}" Text="A strict restriction: the process can ONLY run on the ticked cores. Pin a game to Performance (P) cores to keep it off the slower Efficiency (E) cores. All ticked = no limit." />
+
+                                    <TextBlock Style="{StaticResource RefName}" Text="CPU sets — preferred cores" />
+                                    <TextBlock Style="{StaticResource RefBody}" Text="A softer version of affinity: it asks Windows to prefer the chosen cores but still lets it use others when needed. This is what Windows Game Mode uses. Use affinity to force, CPU sets to nudge." />
+
+                                    <TextBlock Style="{StaticResource RefName}" Text="I/O priority" />
+                                    <TextBlock Style="{StaticResource RefBody}" Text="Disk read/write scheduling. Very low and Low keep background disk activity from stalling your game; Normal is the default for active apps." />
+
+                                    <TextBlock Style="{StaticResource RefName}" Text="Memory priority" />
+                                    <TextBlock Style="{StaticResource RefBody}" Text="How readily the process's RAM pages are trimmed under pressure. Very low / Low give up memory first; Normal keeps pages resident longer." />
+
+                                    <TextBlock Style="{StaticResource RefName}" Text="Efficiency mode (EcoQoS)" />
+                                    <TextBlock Style="{StaticResource RefBody}" Text="Runs the process on efficient cores at low clocks to save power and heat. Great for background apps — turn Off for anything you want at full speed." />
+
+                                    <TextBlock Style="{StaticResource RefName}" Text="Priority boost" />
+                                    <TextBlock Style="{StaticResource RefBody}" Text="The short priority bump Windows gives a window when it's focused. Leave enabled normally; disable for steadier, more predictable scheduling." />
+
+                                    <TextBlock Style="{StaticResource RefName}" Text="GPU preference" />
+                                    <TextBlock Style="{StaticResource RefBody}" Text="Which GPU the app launches on. High performance forces the discrete GPU (best for games); it applies the next time the app starts." />
+
+                                    <TextBlock Style="{StaticResource RefName}" Text="GPU priority" />
+                                    <TextBlock Style="{StaticResource RefBody}" Text="Scheduling priority for this process's work on the GPU relative to others. Higher favors it when the GPU is busy." />
+
+                                    <TextBlock Style="{StaticResource RefName}" Text="Power profile" />
+                                    <TextBlock Style="{StaticResource RefBody}" Text="Switches the whole system's Windows power plan (e.g. High performance) so the CPU/GPU clock up more aggressively while you play." />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </ui:Card>
+                    </Grid>
                 </Grid>
             </TabItem>
 
