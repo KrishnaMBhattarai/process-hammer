@@ -25,6 +25,27 @@ public sealed class AffinityCoreItem : ViewModelBase
     }
 }
 
+/// <summary>
+/// One checkable option in a right-click submenu (CPU priority, I/O, memory, …). <see cref="IsChecked"/>
+/// reflects the value currently applied to the selected process; <see cref="Command"/> applies this one.
+/// </summary>
+public sealed class MenuOptionItem : ViewModelBase
+{
+    private bool _checked;
+
+    public MenuOptionItem(string label, object? value, Action<object?> apply)
+    {
+        Label = label;
+        Value = value;
+        Command = new RelayCommand(_ => apply(value));
+    }
+
+    public string Label { get; }
+    public object? Value { get; }
+    public bool IsChecked { get => _checked; set => SetField(ref _checked, value); }
+    public RelayCommand Command { get; }
+}
+
 /// <summary>One Windows power plan in the right-click "Power profile" list. <see cref="SelectCommand"/> switches to it.</summary>
 public sealed class PowerProfileItem : ViewModelBase
 {
@@ -41,6 +62,13 @@ public sealed class PowerProfileItem : ViewModelBase
     public bool IsActive { get => _active; set => SetField(ref _active, value); }
     public RelayCommand? SelectCommand { get; set; }
 }
+
+/// <summary>
+/// A process's current live settings, so the Rule editor can pre-select what's actually applied
+/// (instead of "Leave unchanged"). Fields we don't read live stay null.
+/// </summary>
+public readonly record struct CurrentState(
+    CpuPriority? Cpu, ulong? Affinity, IoPriority? Io, MemoryPriority? Memory, bool? Eco, bool? BoostEnabled);
 
 /// <summary>One row in the Booster Rules tab: a saved rule summarised for display.</summary>
 public sealed class RuleRowViewModel : ViewModelBase

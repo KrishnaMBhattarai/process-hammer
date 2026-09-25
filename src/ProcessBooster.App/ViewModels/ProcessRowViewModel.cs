@@ -45,6 +45,13 @@ public sealed class ProcessRowViewModel : ViewModelBase
     /// <summary>Raw affinity bitmask (null/0 = all cores) — drives the affinity checkbox list.</summary>
     public ulong? AffinityMaskRaw { get => _affinityRaw; private set => SetField(ref _affinityRaw, value); }
 
+    // Raw current values — let the right-click menus show a checkmark on what's applied now.
+    public CpuPriority? CpuPriorityRaw { get; private set; }
+    public IoPriority? IoRaw { get; private set; }
+    public MemoryPriority? MemoryRaw { get; private set; }
+    public bool? EcoRaw { get; private set; }
+    public bool? BoostEnabledRaw { get; private set; }
+
     public void Update(ProcessSnapshot s, double cpuPercent)
     {
         Name = s.Name;
@@ -56,6 +63,11 @@ public sealed class ProcessRowViewModel : ViewModelBase
         Io = s.IoPriority?.ToString() ?? "—";
         Memory = s.MemoryPriority?.ToString() ?? "—";
         Eco = s.EfficiencyMode == true ? "On" : "—";
+        CpuPriorityRaw = s.CpuPriority;
+        IoRaw = s.IoPriority;
+        MemoryRaw = s.MemoryPriority;
+        EcoRaw = s.EfficiencyMode;
+        BoostEnabledRaw = s.PriorityBoostEnabled;
         WorkingSet = FormatBytes(s.WorkingSetBytes);
         Threads = s.ThreadCount;
         Rule = s.GovernedByRule;

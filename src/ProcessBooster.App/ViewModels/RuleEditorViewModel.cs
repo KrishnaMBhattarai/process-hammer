@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using ProcessBooster.Core.Models;
 using ProcessBooster.Core.Services;
 using ProcessBooster.Core.Util;
@@ -29,8 +30,64 @@ public sealed class RuleEditorViewModel : ViewModelBase
             new("Custom (core list)", CpuSetSelection.Custom),
         };
 
+        for (var i = 0; i < Math.Max(1, Environment.ProcessorCount); i++)
+        {
+            var index = i;
+            AffinityCores.Add(new AffinityCoreItem(index, OnAffinityCoreToggled));
+        }
+        AffinityPresetCommand = new RelayCommand(SetAffinityPreset);
+
         LoadFrom(null); // start empty
     }
+
+    // ---- CPU affinity as per-core checkboxes (keeps AffinityText, the source of truth, in sync) ----
+    public ObservableCollection<AffinityCoreItem> AffinityCores { get; } = new();
+    public RelayCommand AffinityPresetCommand { get; }
+    private bool _suppressAffinitySync;
+
+    private void OnAffinityCoreToggled()
+    {
+        if (_suppressAffinitySync) return;
+        RecomputeAffinityText();
+    }
+
+    private void RecomputeAffinityText()
+    {
+        ulong mask = 0;
+        foreach (var c in AffinityCores) if (c.IsChecked) mask |= 1UL << c.Index;
+        AffinityText = mask == 0 || mask == AllMask() ? "" : AffinityMask.ToRangeString(mask);
+    }
+
+    private void SyncAffinityCoresFromText()
+    {
+        _suppressAffinitySync = true;
+        try
+        {
+            if (!AffinityMask.TryParseRangeString(AffinityText, 64, out var mask) || mask == 0)
+                foreach (var c in AffinityCores) c.IsChecked = true; // blank = all cores
+            else
+                foreach (var c in AffinityCores) c.IsChecked = (mask & (1UL << c.Index)) != 0;
+        }
+        finally { _suppressAffinitySync = false; }
+    }
+
+    private void SetAffinityPreset(object? param)
+    {
+        var mask = param?.ToString() switch
+        {
+            "p" => CoreClassMask(performance: true),
+            "e" => CoreClassMask(performance: false),
+            _ => AllMask(),
+        };
+        _suppressAffinitySync = true;
+        try { foreach (var c in AffinityCores) c.IsChecked = (mask & (1UL << c.Index)) != 0; }
+        finally { _suppressAffinitySync = false; }
+        RecomputeAffinityText();
+    }
+
+    private ulong AllMask() => AffinityPresets.AllMask(AffinityCores.Count);
+
+    private ulong CoreClassMask(bool performance) => AffinityPresets.ClassMask(_topology.Sets, performance, AffinityCores.Count);
 
     // ---- target process ----
     private string _targetName = "";
@@ -95,19 +152,35 @@ public sealed class RuleEditorViewModel : ViewModelBase
         LoadFrom(null);
     }
 
-    public void LoadFrom(ProcessRule? rule)
+    /// <summary>
+    /// Populate the editor. A saved <paramref name="rule"/> takes precedence; for anything it doesn't
+    /// set, fall back to the process's <paramref name="current"/> live state so the dropdowns show what
+    /// is actually applied now (rather than "Leave unchanged"). This mirrors the right-click menu.
+    /// </summary>
+    public void LoadFrom(ProcessRule? rule, CurrentState? current = null)
     {
-        SelectedCpuPriority = Match(CpuPriorityOptions, rule?.CpuPriority);
-        SelectedIo = Match(IoOptions, rule?.IoPriority);
-        SelectedMemory = Match(MemoryOptions, rule?.MemoryPriority);
+        var c = current ?? default;
+        var boostDisabled = rule?.DisablePriorityBoost ?? (c.BoostEnabled is { } en ? !en : (bool?)null);
+
+        SelectedCpuPriority = Match(CpuPriorityOptions, rule?.CpuPriority ?? c.Cpu);
+        SelectedIo = Match(IoOptions, rule?.IoPriority ?? c.Io);
+        SelectedMemory = Match(MemoryOptions, rule?.MemoryPriority ?? c.Memory);
         SelectedGpuPreference = Match(GpuPreferenceOptions, rule?.GpuPreference);
         SelectedGpuScheduling = Match(GpuSchedulingOptions, rule?.GpuSchedulingPriority);
-        SelectedEfficiency = Match(EfficiencyOptions, rule?.EfficiencyMode);
-        SelectedBoost = Match(BoostOptions, rule?.DisablePriorityBoost);
+        SelectedEfficiency = Match(EfficiencyOptions, rule?.EfficiencyMode ?? c.Eco);
+        SelectedBoost = Match(BoostOptions, boostDisabled);
         SelectedCpuSet = Match(CpuSetOptions, rule?.CpuSetSelection ?? CpuSetSelection.Unset) ?? CpuSetOptions[0];
-        AffinityText = rule?.AffinityMask is { } m && m != 0 ? AffinityMask.ToRangeString(m) : "";
+
+        var affinity = rule?.AffinityMask is { } m && m != 0 ? m
+            : c.Affinity is { } am && am != 0 ? am : (ulong?)null;
+        AffinityText = NormalizeAffinity(affinity);
         CustomCpuSetText = rule is { CpuSetSelection: CpuSetSelection.Custom } ? IndicesFromSetIds(rule.CpuSetIds) : "";
+        SyncAffinityCoresFromText();
     }
+
+    /// <summary>All-cores (or empty) masks render as blank; a real subset renders as a range string.</summary>
+    private string NormalizeAffinity(ulong? mask) =>
+        mask is not { } m || m == 0 || m == AllMask() ? "" : AffinityMask.ToRangeString(m);
 
     /// <summary>Builds a rule from the current editor state. Returns null if nothing is set.</summary>
     public ProcessRule? BuildRule()
