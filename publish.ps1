@@ -47,11 +47,21 @@ if ($Release) {
         throw "GitHub CLI 'gh' not found. Install it (https://cli.github.com) or run without -Release."
     }
     Write-Host "Publishing GitHub release $tag ..." -ForegroundColor Cyan
+    $notes = @"
+Process Hammer $tag — portable single-file build (bundles .NET; no install).
+
+**SHA-256** ``$exeName``:
+``````
+$hash
+``````
+Verify with: ``Get-FileHash .\$exeName -Algorithm SHA256``
+"@
     gh release view $tag *> $null 2>&1
     if ($LASTEXITCODE -ne 0) {
-        gh release create $tag "$dist\$exeName" "$dist\$exeName.sha256" --title $tag --notes "Process Hammer $tag"
+        gh release create $tag "$dist\$exeName" "$dist\$exeName.sha256" --title $tag --notes $notes
     } else {
         gh release upload $tag "$dist\$exeName" "$dist\$exeName.sha256" --clobber
+        gh release edit $tag --notes $notes   # keep the SHA in the notes current
     }
     Write-Host "Release $tag published." -ForegroundColor Green
 }

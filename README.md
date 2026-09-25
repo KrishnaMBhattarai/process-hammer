@@ -135,7 +135,12 @@ dotnet test  -c Release     # 167 tests (see "Testing" below)
 ```
 
 `publish.ps1` writes everything to a `dist\` folder in the repo (gitignored): a runtime-dependent
-folder build and a self-contained single-file exe, plus its `.sha256`.
+folder build and a self-contained single-file exe, plus its `.sha256`. Run `./publish.ps1 -Release`
+to also publish the GitHub release (needs the `gh` CLI).
+
+Releases are automated: **GitHub Actions** builds, tests, and publishes the release (with its SHA-256)
+on every push to `main` — so the [Releases page](https://github.com/KrishnaMBhattarai/process-hammer/releases)
+always matches the current `<Version>`.
 
 ### ✅ Testing
 
@@ -161,6 +166,18 @@ localization.
 
 PRs welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)**. Best first help: **test on your hardware**
 and file issues for anything that reads wrong.
+
+## ⚖️ Disclaimer
+
+Process Hammer is free software provided **"as is", with no warranty — use it at your own risk.**
+Changing process/CPU/GPU/power settings can affect system stability, and using it on online games or
+other protected software may violate that software's terms; **you are solely responsible for how you
+use it.** To the maximum extent permitted by law, the authors are **not liable** for any damage, data
+loss, account actions, or other consequences. Nobody is forcing you to install or run it.
+
+This is an **independent open-source project** — not affiliated with, endorsed by, or copied from any
+other company or product; it's built entirely on publicly documented Windows APIs. Full text:
+**[DISCLAIMER.md](DISCLAIMER.md)**.
 
 ## 📄 License
 
