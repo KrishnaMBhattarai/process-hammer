@@ -27,15 +27,46 @@
             <Setter Property="Margin" Value="0,0,8,0" />
         </Style>
 
-        <!-- Tab header text turns purple + semibold when its tab is selected -->
+        <!-- Header text goes white + semibold on the purple selected tab -->
         <Style x:Key="TabHeaderText" TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="True">
-                    <Setter Property="Foreground" Value="{StaticResource AccentPurple}" />
+                    <Setter Property="Foreground" Value="White" />
                     <Setter Property="FontWeight" Value="SemiBold" />
                 </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <!-- Selected tab: the whole tab fills purple (white text/icon). -->
+        <Style x:Key="MainTab" TargetType="TabItem">
+            <Setter Property="Padding" Value="14,9" />
+            <Setter Property="Margin" Value="2,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Bd"
+                                Background="Transparent"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}"
+                                Margin="{TemplateBinding Margin}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#22FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentPurple}" />
+                                <Setter TargetName="Bd" Property="TextElement.Foreground" Value="White" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Shared layout for every hardware tab: note + live tiles + detail cards -->
@@ -222,7 +253,7 @@
             </TabControl.ItemsPanel>
 
             <!-- ============================ PROCESSES ============================ -->
-            <TabItem>
+            <TabItem Style="{StaticResource MainTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Apps24" Style="{StaticResource TabIcon}" />
@@ -382,7 +413,7 @@
             </TabItem>
 
             <!-- ============================ HARDWARE TABS ============================ -->
-            <TabItem Content="{Binding SystemTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding SystemTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Board24" Style="{StaticResource TabIcon}" />
@@ -390,7 +421,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding OsTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding OsTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Window24" Style="{StaticResource TabIcon}" />
@@ -398,7 +429,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding SecurityTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding SecurityTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="ShieldTask24" Style="{StaticResource TabIcon}" />
@@ -406,7 +437,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding UsersTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding UsersTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="People24" Style="{StaticResource TabIcon}" />
@@ -414,7 +445,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding StartupTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding StartupTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Power24" Style="{StaticResource TabIcon}" />
@@ -422,7 +453,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding SoftwareTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding SoftwareTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="AppsList24" Style="{StaticResource TabIcon}" />
@@ -430,7 +461,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding ServicesTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding ServicesTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Wrench24" Style="{StaticResource TabIcon}" />
@@ -438,7 +469,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding DevicesTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding DevicesTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="UsbPlug24" Style="{StaticResource TabIcon}" />
@@ -446,7 +477,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding EnvironmentTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding EnvironmentTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Code24" Style="{StaticResource TabIcon}" />
@@ -454,7 +485,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding CpuTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding CpuTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="DeveloperBoard24" Style="{StaticResource TabIcon}" />
@@ -462,7 +493,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding MemoryTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding MemoryTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Memory16" Style="{StaticResource TabIcon}" />
@@ -470,7 +501,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding GraphicsTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding GraphicsTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Games24" Style="{StaticResource TabIcon}" />
@@ -478,7 +509,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding DisplayTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding DisplayTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Desktop24" Style="{StaticResource TabIcon}" />
@@ -486,7 +517,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding StorageTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding StorageTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Storage24" Style="{StaticResource TabIcon}" />
@@ -494,7 +525,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding NetworkTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding NetworkTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Globe24" Style="{StaticResource TabIcon}" />
@@ -502,7 +533,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding SensorsTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding SensorsTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="Gauge24" Style="{StaticResource TabIcon}" />
@@ -510,7 +541,7 @@
                     </StackPanel>
                 </TabItem.Header>
             </TabItem>
-            <TabItem Content="{Binding PowerTab}">
+            <TabItem Style="{StaticResource MainTab}" Content="{Binding PowerTab}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <ui:SymbolIcon Symbol="BatteryCharge24" Style="{StaticResource TabIcon}" />
