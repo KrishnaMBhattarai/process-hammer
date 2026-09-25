@@ -273,6 +273,7 @@ public sealed class MainViewModel : ViewModelBase
 
         _log.Logged += OnLogged;
         _timer.Tick += (_, _) => Refresh();
+        _toastTimer.Tick += (_, _) => HideToast();
     }
 
     public void Start()
@@ -342,7 +343,7 @@ public sealed class MainViewModel : ViewModelBase
         set
         {
             if (!SetField(ref _selected, value)) return;
-            StatusMessage = ""; // fresh selection, clear the last result
+            HideToast(); // fresh selection, clear the last result
             // Read the current settings that aren't in the live table (CPU sets, GPU priority/preference)
             // once per selection, so both the menu checkmarks and the editor reflect reality.
             _extras = value is null ? default : _controller.ReadCurrentExtras(value.Pid, value.ExePath);
@@ -473,26 +474,53 @@ public sealed class MainViewModel : ViewModelBase
     private void Act(ProcessRowViewModel p, ActionResult r)
     {
         _log.Action($"{p.Name} (pid {p.Pid}) {r}");
-        ShowActionStatus(p.Name, r);
+        ShowActionToast(p.Name, r);
     }
 
-    // A short, visible result of the last user action (successes clear it; failures explain why).
-    private string _statusMessage = "";
-    public string StatusMessage { get => _statusMessage; private set => SetField(ref _statusMessage, value); }
+    // ---- transient success/failure toast (auto-hides) ----
+    private readonly DispatcherTimer _toastTimer = new();
+    private string _toastTitle = "";
+    private string _toastDetail = "";
+    private bool _toastIsError;
+    public string ToastTitle { get => _toastTitle; private set => SetField(ref _toastTitle, value); }
+    public string ToastDetail { get => _toastDetail; private set => SetField(ref _toastDetail, value); }
+    public bool ToastIsError { get => _toastIsError; private set => SetField(ref _toastIsError, value); }
+    public bool ToastVisible => !string.IsNullOrEmpty(_toastTitle);
 
-    private void ShowActionStatus(string name, ActionResult r)
+    private void ShowActionToast(string name, ActionResult r)
     {
         var denied = r.Detail is { } d && (d.Contains("error 5") || d.Contains("0xC0000022"));
-        StatusMessage = r.Status switch
+        switch (r.Status)
         {
-            ActionStatus.Failed when denied =>
-                $"⚠  {name} is a protected process (anti-cheat / system) — it can't be modified, even as admin. " +
-                "GPU preference and the power profile still work, and you can lower OTHER apps' priority to free resources for it.",
-            ActionStatus.Failed => $"⚠  {r.Action} failed: {r.Detail}",
-            ActionStatus.Unsupported => $"{r.Action}: {r.Detail}",
-            ActionStatus.Applied => $"✓  {r.Action} applied to {name}.",
-            _ => "",
-        };
+            case ActionStatus.Applied:
+                ShowToast(error: false, "Success!", $"{r.Action} applied to {name}.", seconds: 5);
+                break;
+            case ActionStatus.Failed:
+                ShowToast(error: true, "Failed!",
+                    denied ? $"{name} is protected (anti-cheat / system) — it can't be modified, even as admin."
+                           : $"{r.Action}: {r.Detail}", seconds: 8);
+                break;
+            // Skipped / Unsupported / AlreadySet don't warrant a popup.
+        }
+    }
+
+    private void ShowToast(bool error, string title, string detail, int seconds)
+    {
+        ToastIsError = error;
+        ToastTitle = title;
+        ToastDetail = detail;
+        Raise(nameof(ToastVisible));
+        _toastTimer.Stop();
+        _toastTimer.Interval = TimeSpan.FromSeconds(seconds);
+        _toastTimer.Start();
+    }
+
+    private void HideToast()
+    {
+        _toastTimer.Stop();
+        ToastTitle = "";
+        ToastDetail = "";
+        Raise(nameof(ToastVisible));
     }
 
     /// <summary>Resolve the exe path on demand (needed for GPU preference + restart) if not already known.</summary>

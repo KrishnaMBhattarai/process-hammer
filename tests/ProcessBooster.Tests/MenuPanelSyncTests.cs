@@ -78,6 +78,25 @@ public class MenuPanelSyncTests
     }
 
     [Fact]
+    public void SuccessfulApply_ShowsGreenSuccessToast()
+    {
+        var vm = NewVm(out var controller);
+        var row = SelfRow();
+        vm.SelectedProcess = row;
+
+        var original = row.MemoryRaw ?? MemoryPriority.Normal;
+        try
+        {
+            vm.MemoryMenu.First(m => (MemoryPriority?)m.Value == MemoryPriority.Low).Command.Execute(null);
+
+            Assert.True(vm.ToastVisible);
+            Assert.Equal("Success!", vm.ToastTitle);
+            Assert.False(vm.ToastIsError);
+        }
+        finally { controller.SetMemoryPriority(Environment.ProcessId, original); }
+    }
+
+    [Fact]
     public void PanelChange_AppliesLiveAndTicksMenu()
     {
         var vm = NewVm(out var controller);
