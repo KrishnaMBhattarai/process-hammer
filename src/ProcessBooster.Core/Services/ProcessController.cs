@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 using ProcessBooster.Core.Interop;
@@ -167,6 +169,60 @@ public sealed class ProcessController
         {
             return new("GpuPreference", ActionStatus.Failed, ex.Message);
         }
+    }
+
+    // ---- one-shot lifecycle actions (not part of a saved rule) ----
+
+    /// <summary>Empty the process working set (RAM trim). Pages are faulted back in on demand.</summary>
+    public ActionResult TrimWorkingSet(int pid)
+    {
+        using var h = Open(pid, NativeMethods.ACCESS_TRIM);
+        if (h.IsInvalid) return Fail("TrimMemory");
+        return NativeMethods.K32EmptyWorkingSet(h)
+            ? new("TrimMemory", ActionStatus.Applied, "working set emptied")
+            : Fail("TrimMemory");
+    }
+
+    /// <summary>Force-kill the process.</summary>
+    public ActionResult Terminate(int pid)
+    {
+        try { using var p = Process.GetProcessById(pid); p.Kill(); return new("Terminate", ActionStatus.Applied); }
+        catch (Exception ex) { return new("Terminate", ActionStatus.Failed, ex.Message); }
+    }
+
+    /// <summary>Ask the process to close gracefully (posts WM_CLOSE to its main window).</summary>
+    public ActionResult Close(int pid)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            return p.CloseMainWindow()
+                ? new("Close", ActionStatus.Applied, "close requested")
+                : new("Close", ActionStatus.Skipped, "no main window to close");
+        }
+        catch (Exception ex) { return new("Close", ActionStatus.Failed, ex.Message); }
+    }
+
+    /// <summary>Kill the process and relaunch its executable, optionally elevated (UAC prompt).</summary>
+    public ActionResult Restart(int pid, string? exePath, bool asAdmin)
+    {
+        var action = asAdmin ? "RestartAsAdmin" : "Restart";
+        if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath))
+            return new(action, ActionStatus.Failed, "executable path unknown");
+        try
+        {
+            try { using var p = Process.GetProcessById(pid); p.Kill(); p.WaitForExit(4000); } catch { /* already gone */ }
+            var psi = new ProcessStartInfo
+            {
+                FileName = exePath,
+                UseShellExecute = true,
+                WorkingDirectory = Path.GetDirectoryName(exePath) ?? "",
+            };
+            if (asAdmin) psi.Verb = "runas";
+            Process.Start(psi);
+            return new(action, ActionStatus.Applied, Path.GetFileName(exePath));
+        }
+        catch (Exception ex) { return new(action, ActionStatus.Failed, ex.Message); }
     }
 
     /// <summary>Apply every action a rule specifies to one process; returns per-action results.</summary>

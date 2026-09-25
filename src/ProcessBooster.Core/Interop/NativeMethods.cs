@@ -12,12 +12,16 @@ internal static class NativeMethods
 {
     // ---- process access rights ----
     internal const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    internal const uint PROCESS_QUERY_INFORMATION = 0x0400;
     internal const uint PROCESS_SET_INFORMATION = 0x0200;
     internal const uint PROCESS_SET_LIMITED_INFORMATION = 0x2000;
+    internal const uint PROCESS_SET_QUOTA = 0x0100;
 
     internal const uint ACCESS_READ = PROCESS_QUERY_LIMITED_INFORMATION;
     internal const uint ACCESS_WRITE =
         PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_INFORMATION | PROCESS_SET_LIMITED_INFORMATION;
+    // EmptyWorkingSet needs query + set-quota rights.
+    internal const uint ACCESS_TRIM = PROCESS_QUERY_INFORMATION | PROCESS_SET_QUOTA;
 
     // ---- priority classes (SetPriorityClass) ----
     internal const uint IDLE_PRIORITY_CLASS = 0x00000040;
@@ -108,4 +112,28 @@ internal static class NativeMethods
 
     [DllImport("gdi32.dll")]
     internal static extern int D3DKMTSetProcessSchedulingPriorityClass(IntPtr hProcess, int priorityClass);
+
+    // ---- working-set trim (psapi, exported from kernel32 as K32*) ----
+    [DllImport("kernel32.dll", SetLastError = true)]
+    internal static extern bool K32EmptyWorkingSet(SafeProcessHandle handle);
+
+    // ---- power schemes (powrprof): list + switch the active plan ----
+    internal const uint ACCESS_SCHEME = 16;
+
+    [DllImport("powrprof.dll")]
+    internal static extern uint PowerEnumerate(IntPtr rootPowerKey, IntPtr schemeGuid, IntPtr subGroupOfPowerSettingsGuid,
+        uint accessFlags, uint index, ref Guid buffer, ref uint bufferSize);
+
+    [DllImport("powrprof.dll")]
+    internal static extern uint PowerReadFriendlyName(IntPtr rootPowerKey, ref Guid schemeGuid, IntPtr subGroupOfPowerSettingsGuid,
+        IntPtr powerSettingGuid, byte[]? buffer, ref uint bufferSize);
+
+    [DllImport("powrprof.dll")]
+    internal static extern uint PowerGetActiveScheme(IntPtr userRootPowerKey, out IntPtr activePolicyGuid);
+
+    [DllImport("powrprof.dll")]
+    internal static extern uint PowerSetActiveScheme(IntPtr userRootPowerKey, ref Guid schemeGuid);
+
+    [DllImport("kernel32.dll")]
+    internal static extern IntPtr LocalFree(IntPtr mem);
 }

@@ -19,6 +19,7 @@ public sealed class ProcessRowViewModel : ViewModelBase
     private int _threads;
     private string? _rule;
     private double _cpuPercent;
+    private ulong? _affinityRaw;
 
     public ProcessRowViewModel(ProcessSnapshot s, double cpuPercent = 0)
     {
@@ -41,12 +42,16 @@ public sealed class ProcessRowViewModel : ViewModelBase
     public string? Rule { get => _rule; set => SetField(ref _rule, value); }
     public bool HasRule => !string.IsNullOrEmpty(_rule);
 
+    /// <summary>Raw affinity bitmask (null/0 = all cores) — drives the affinity checkbox list.</summary>
+    public ulong? AffinityMaskRaw { get => _affinityRaw; private set => SetField(ref _affinityRaw, value); }
+
     public void Update(ProcessSnapshot s, double cpuPercent)
     {
         Name = s.Name;
         CpuPercent = cpuPercent;
         if (s.ExePath is not null) ExePath = s.ExePath; // keep a path we resolved earlier
         Cpu = s.CpuPriority?.ToString() ?? "—";
+        AffinityMaskRaw = s.AffinityMask;
         Affinity = s.AffinityMask is { } m && m != 0 ? AffinityMask.ToRangeString(m) : "all";
         Io = s.IoPriority?.ToString() ?? "—";
         Memory = s.MemoryPriority?.ToString() ?? "—";

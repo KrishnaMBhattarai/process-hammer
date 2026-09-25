@@ -20,6 +20,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly ConfigStore _store;
     private readonly ProcessInspector _inspector;
     private readonly ProcessController _controller;
+    private readonly PowerService _power;
     private readonly RuleEngine _engine;
     private readonly ActionLog _log;
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
@@ -27,11 +28,28 @@ public sealed class MainViewModel : ViewModelBase
     private readonly int _cpuCount = Math.Max(1, Environment.ProcessorCount);
     private DateTime _lastTick = DateTime.UtcNow;
     private bool _refreshing;
+    private bool _suppressAffinity;
+
+    /// <summary>Booster Rules is the second tab (index 1), right after Processes.</summary>
+    private const int BoosterTabIndex = 1;
 
     public ObservableCollection<ProcessRowViewModel> Processes { get; } = new();
     public ICollectionView ProcessView { get; }
     public ObservableCollection<string> LogLines { get; } = new();
     public RuleEditorViewModel Editor { get; }
+
+    // Right-click menu backing collections.
+    public ObservableCollection<AffinityCoreItem> AffinityCores { get; } = new();
+    public ObservableCollection<PowerProfileItem> PowerProfiles { get; } = new();
+
+    // Booster Rules tab.
+    public ObservableCollection<RuleRowViewModel> BoosterRules { get; } = new();
+    private RuleRowViewModel? _selectedRule;
+    public RuleRowViewModel? SelectedRule
+    {
+        get => _selectedRule;
+        set { if (SetField(ref _selectedRule, value)) RaiseRuleCommands(); }
+    }
     private readonly LiveMonitor _monitor;
     private readonly ITab?[] _tabByIndex;
 
@@ -64,11 +82,32 @@ public sealed class MainViewModel : ViewModelBase
     public RelayCommand CopySpecsCommand { get; }
     public RelayCommand ExportReportCommand { get; }
 
+    // Right-click boosting actions.
+    public RelayCommand QuickIoCommand { get; }
+    public RelayCommand QuickMemoryCommand { get; }
+    public RelayCommand QuickGpuSchedulingCommand { get; }
+    public RelayCommand QuickGpuPreferenceCommand { get; }
+    public RelayCommand QuickBoostCommand { get; }
+    public RelayCommand QuickCpuSetCommand { get; }
+    public RelayCommand TrimMemoryCommand { get; }
+    public RelayCommand CopyRuleCommand { get; }
+    public RelayCommand RestartProcessCommand { get; }
+    public RelayCommand RestartAsAdminCommand { get; }
+    public RelayCommand CloseProcessCommand { get; }
+    public RelayCommand TerminateProcessCommand { get; }
+
+    // Booster Rules tab actions.
+    public RelayCommand ApplySelectedRuleCommand { get; }
+    public RelayCommand ToggleRuleEnabledCommand { get; }
+    public RelayCommand RemoveSelectedRuleCommand { get; }
+    public RelayCommand RemoveAllRulesCommand { get; }
+
     public MainViewModel(AppConfig config, ConfigStore store, ProcessInspector inspector,
-        ProcessController controller, CpuTopology topology, RuleEngine engine, ActionLog log, LiveMonitor monitor)
+        ProcessController controller, CpuTopology topology, RuleEngine engine, ActionLog log, LiveMonitor monitor,
+        PowerService power)
     {
         _config = config; _store = store; _inspector = inspector;
-        _controller = controller; _engine = engine; _log = log; _monitor = monitor;
+        _controller = controller; _engine = engine; _log = log; _monitor = monitor; _power = power;
 
         Editor = new RuleEditorViewModel(topology);
 
@@ -149,10 +188,11 @@ public sealed class MainViewModel : ViewModelBase
         PowerTab = new HardwareTabViewModel(PowerInfoService.Collect);
         SensorsTab = new SensorsTabViewModel(monitor, note);
 
-        // Index 0 = Processes (no hardware VM); the rest map to tabs in the same order as the XAML.
+        // Index 0 = Processes, index 1 = Booster Rules (neither has a hardware VM); the rest map to
+        // tabs in the same order as the XAML.
         _tabByIndex = new ITab?[]
         {
-            null, SystemTab, OsTab, SecurityTab, UsersTab, StartupTab, SoftwareTab, ServicesTab,
+            null, null, SystemTab, OsTab, SecurityTab, UsersTab, StartupTab, SoftwareTab, ServicesTab,
             DevicesTab, EnvironmentTab, CpuTab, MemoryTab, GraphicsTab,
             DisplayTab, StorageTab, NetworkTab, SensorsTab, PowerTab,
         };
@@ -172,6 +212,44 @@ public sealed class MainViewModel : ViewModelBase
         CopySpecsCommand = new RelayCommand(_ => CopySpecs());
         ExportReportCommand = new RelayCommand(_ => ExportReport());
 
+        QuickIoCommand = new RelayCommand(QuickIo);
+        QuickMemoryCommand = new RelayCommand(QuickMemory);
+        QuickGpuSchedulingCommand = new RelayCommand(QuickGpuScheduling);
+        QuickGpuPreferenceCommand = new RelayCommand(QuickGpuPreference);
+        QuickBoostCommand = new RelayCommand(QuickBoost);
+        QuickCpuSetCommand = new RelayCommand(QuickCpuSet);
+        TrimMemoryCommand = new RelayCommand(_ => TrimMemory());
+        CopyRuleCommand = new RelayCommand(_ => CopyRule());
+        RestartProcessCommand = new RelayCommand(_ => RestartProcess(asAdmin: false));
+        RestartAsAdminCommand = new RelayCommand(_ => RestartProcess(asAdmin: true));
+        CloseProcessCommand = new RelayCommand(_ => CloseProcess());
+        TerminateProcessCommand = new RelayCommand(_ => TerminateProcess());
+
+        ApplySelectedRuleCommand = new RelayCommand(_ => ApplySelectedRule(), _ => SelectedRule is not null);
+        ToggleRuleEnabledCommand = new RelayCommand(_ => ToggleRuleEnabled(), _ => SelectedRule is not null);
+        RemoveSelectedRuleCommand = new RelayCommand(_ => RemoveSelectedRule(), _ => SelectedRule is not null);
+        RemoveAllRulesCommand = new RelayCommand(_ => RemoveAllRules(), _ => _config.Rules.Count > 0);
+
+        // One checkbox per logical CPU for the right-click affinity list.
+        for (var i = 0; i < _cpuCount; i++)
+        {
+            var index = i;
+            AffinityCores.Add(new AffinityCoreItem(index, ApplyAffinityFromCores));
+        }
+
+        // Populate the power-plan list once (they rarely change); each item switches the active plan.
+        try
+        {
+            foreach (var s in _power.ListSchemes())
+            {
+                var item = new PowerProfileItem(s.Guid, s.Name);
+                item.SelectCommand = new RelayCommand(_ => SetPowerProfile(item));
+                PowerProfiles.Add(item);
+            }
+            RefreshActivePowerProfile();
+        }
+        catch (Exception ex) { _log.Warn("Could not read power plans: " + ex.Message); }
+
         _log.Logged += OnLogged;
         _timer.Tick += (_, _) => Refresh();
     }
@@ -180,6 +258,7 @@ public sealed class MainViewModel : ViewModelBase
     {
         IsAdmin = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
         foreach (var e in _log.Recent()) LogLines.Add(e.ToString());
+        RebuildBoosterRules();
         Refresh();
         _timer.Start();       // Processes tab (index 0) is active on launch
         EngineRunning = true; // auto-run so rules take effect (toggle to pause)
@@ -203,6 +282,7 @@ public sealed class MainViewModel : ViewModelBase
         else if (oldIndex > 0 && oldIndex < _tabByIndex.Length) _tabByIndex[oldIndex]?.Deactivate();
 
         if (newIndex == 0) { _timer.Start(); Refresh(); }
+        else if (newIndex == BoosterTabIndex) RebuildBoosterRules(); // refresh saved rules + running status on open
         else if (newIndex > 0 && newIndex < _tabByIndex.Length) _tabByIndex[newIndex]?.Activate();
     }
 
@@ -241,6 +321,7 @@ public sealed class MainViewModel : ViewModelBase
         set
         {
             if (!SetField(ref _selected, value)) return;
+            RefreshAffinityCores(value?.AffinityMaskRaw);
             if (value is null) Editor.Clear();
             else
             {
@@ -339,6 +420,7 @@ public sealed class MainViewModel : ViewModelBase
                 _prevCpu.Remove(pid);
 
             ProcessCount = Processes.Count;
+            UpdateRulesRunning();
             Raise(nameof(RuleCount));
             Raise(nameof(StatusText));
         }
@@ -365,7 +447,185 @@ public sealed class MainViewModel : ViewModelBase
     {
         if (SelectedProcess is not { } p) return;
         var on = param is bool b ? b : string.Equals(param?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
-        _log.Action($"{p.Name} (pid {p.Pid}) {_controller.SetEfficiencyMode(p.Pid, on)}");
+        Act(p, _controller.SetEfficiencyMode(p.Pid, on));
+    }
+
+    private void Act(ProcessRowViewModel p, ActionResult r) => _log.Action($"{p.Name} (pid {p.Pid}) {r}");
+
+    /// <summary>Resolve the exe path on demand (needed for GPU preference + restart) if not already known.</summary>
+    private void EnsureExePath(ProcessRowViewModel p)
+    {
+        if (p.ExePath is not null) return;
+        try { p.ExePath = _inspector.ReadExePath(p.Pid); } catch { /* best effort */ }
+    }
+
+    private void QuickIo(object? param)
+    {
+        if (SelectedProcess is { } p && param is IoPriority io) Act(p, _controller.SetIoPriority(p.Pid, io));
+    }
+
+    private void QuickMemory(object? param)
+    {
+        if (SelectedProcess is { } p && param is MemoryPriority mem) Act(p, _controller.SetMemoryPriority(p.Pid, mem));
+    }
+
+    private void QuickGpuScheduling(object? param)
+    {
+        if (SelectedProcess is { } p && param is GpuSchedulingPriority g) Act(p, _controller.SetGpuSchedulingPriority(p.Pid, g));
+    }
+
+    private void QuickGpuPreference(object? param)
+    {
+        if (SelectedProcess is not { } p || param is not GpuPreference g) return;
+        EnsureExePath(p);
+        Act(p, _controller.SetGpuPreference(p.ExePath, g));
+    }
+
+    private void QuickBoost(object? param)
+    {
+        if (SelectedProcess is not { } p) return;
+        var disabled = string.Equals(param?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+        Act(p, _controller.SetPriorityBoostDisabled(p.Pid, disabled));
+    }
+
+    private void QuickCpuSet(object? param)
+    {
+        if (SelectedProcess is { } p && param is CpuSetSelection sel) Act(p, _controller.SetCpuSets(p.Pid, sel, null));
+    }
+
+    // ---- CPU affinity checkbox list ----
+    private ulong AllCoresMask() => _cpuCount >= 64 ? ulong.MaxValue : (1UL << _cpuCount) - 1;
+
+    /// <summary>Rebuild the affinity checkboxes from a process's current mask, without triggering an apply.</summary>
+    private void RefreshAffinityCores(ulong? mask)
+    {
+        _suppressAffinity = true;
+        try
+        {
+            var effective = mask is { } m && m != 0 ? m : AllCoresMask();
+            foreach (var c in AffinityCores) c.IsChecked = (effective & (1UL << c.Index)) != 0;
+        }
+        finally { _suppressAffinity = false; }
+    }
+
+    private void ApplyAffinityFromCores()
+    {
+        if (_suppressAffinity || SelectedProcess is not { } p) return;
+        ulong mask = 0;
+        foreach (var c in AffinityCores) if (c.IsChecked) mask |= 1UL << c.Index;
+        if (mask == 0) mask = AllCoresMask(); // unchecking everything = all cores
+        Act(p, _controller.SetAffinity(p.Pid, mask));
+    }
+
+    // ---- lifecycle actions ----
+    private void TrimMemory() { if (SelectedProcess is { } p) Act(p, _controller.TrimWorkingSet(p.Pid)); }
+
+    private void TerminateProcess()
+    {
+        if (SelectedProcess is not { } p) return;
+        Act(p, _controller.Terminate(p.Pid));
+        Refresh();
+    }
+
+    private void CloseProcess() { if (SelectedProcess is { } p) Act(p, _controller.Close(p.Pid)); }
+
+    private void RestartProcess(bool asAdmin)
+    {
+        if (SelectedProcess is not { } p) return;
+        EnsureExePath(p);
+        Act(p, _controller.Restart(p.Pid, p.ExePath, asAdmin));
+    }
+
+    private void CopyRule()
+    {
+        if (SelectedProcess is not { } p) return;
+        var rule = FindRule(p.Name);
+        var text = rule is not null
+            ? ConfigStore.Serialize(new AppConfig { Rules = { rule } })
+            : $"{p.Name}: no saved rule. Current — priority {p.Cpu}, cores {p.Affinity}, I/O {p.Io}, memory {p.Memory}, eco {p.Eco}";
+        try { System.Windows.Clipboard.SetText(text); _log.Info($"Copied rule/settings for {p.Name} to clipboard."); }
+        catch (Exception ex) { _log.Error("Copy failed: " + ex.Message); }
+    }
+
+    // ---- power profile ----
+    private void SetPowerProfile(PowerProfileItem item)
+    {
+        if (_power.SetActiveScheme(item.Guid)) { _log.Info($"Power plan → {item.Name}."); RefreshActivePowerProfile(); }
+        else _log.Warn($"Could not switch to power plan {item.Name}.");
+    }
+
+    private void RefreshActivePowerProfile()
+    {
+        var active = _power.GetActiveScheme();
+        foreach (var it in PowerProfiles) it.IsActive = active is { } a && a == it.Guid;
+    }
+
+    // ---- Booster Rules tab ----
+    private void RebuildBoosterRules()
+    {
+        BoosterRules.Clear();
+        foreach (var r in _config.Rules.OrderBy(r => r.Match, StringComparer.OrdinalIgnoreCase))
+            BoosterRules.Add(new RuleRowViewModel(r));
+        UpdateRulesRunning();
+        RemoveAllRulesCommand.RaiseCanExecuteChanged();
+        Raise(nameof(RuleCount));
+        Raise(nameof(StatusText));
+    }
+
+    private void UpdateRulesRunning()
+    {
+        if (BoosterRules.Count == 0) return;
+        var running = Processes.Select(p => ProcessRule.Normalize(p.Name)).ToHashSet();
+        foreach (var rr in BoosterRules) rr.Running = running.Contains(rr.Rule.NormalizedMatch);
+    }
+
+    private void ApplySelectedRule()
+    {
+        if (SelectedRule is not { } rr) return;
+        var any = false;
+        foreach (var p in Processes.Where(p => ProcessRule.Normalize(p.Name) == rr.Rule.NormalizedMatch))
+        {
+            any = true;
+            foreach (var res in _controller.ApplyRule(rr.Rule, p.Pid, p.ExePath)) Act(p, res);
+        }
+        if (!any) _log.Info($"No running process matches rule '{rr.Process}'.");
+    }
+
+    private void ToggleRuleEnabled()
+    {
+        if (SelectedRule is not { } rr) return;
+        rr.Rule.Enabled = !rr.Rule.Enabled;
+        _log.Info($"{rr.Process} rule {(rr.Rule.Enabled ? "enabled" : "disabled")}.");
+        Persist();
+        RebuildBoosterRules();
+    }
+
+    private void RemoveSelectedRule()
+    {
+        if (SelectedRule is not { } rr) return;
+        _config.Rules.RemoveAll(r => r.NormalizedMatch == rr.Rule.NormalizedMatch);
+        _log.Info($"Removed rule for {rr.Process}.");
+        Persist();
+        RebuildBoosterRules();
+        RaiseCommands();
+    }
+
+    private void RemoveAllRules()
+    {
+        if (_config.Rules.Count == 0) return;
+        var n = _config.Rules.Count;
+        _config.Rules.Clear();
+        _log.Info($"Removed all {n} rule(s).");
+        Persist();
+        RebuildBoosterRules();
+        RaiseCommands();
+    }
+
+    private void RaiseRuleCommands()
+    {
+        ApplySelectedRuleCommand.RaiseCanExecuteChanged();
+        ToggleRuleEnabledCommand.RaiseCanExecuteChanged();
+        RemoveSelectedRuleCommand.RaiseCanExecuteChanged();
     }
 
     private void SaveRule()
@@ -381,6 +641,7 @@ public sealed class MainViewModel : ViewModelBase
         }
         else _log.Info($"Cleared rule for {p.Name} (no settings chosen).");
         Persist();
+        RebuildBoosterRules();
         RaiseCommands();
         Refresh();
     }
@@ -392,6 +653,7 @@ public sealed class MainViewModel : ViewModelBase
         if (removed > 0) _log.Info($"Removed rule for {p.Name}.");
         Editor.LoadFrom(null);
         Persist();
+        RebuildBoosterRules();
         RaiseCommands();
         Refresh();
     }
@@ -408,6 +670,7 @@ public sealed class MainViewModel : ViewModelBase
             _config.PollSeconds = imported.PollSeconds;
             _config.RestorePowerPlan = imported.RestorePowerPlan;
             Persist();
+            RebuildBoosterRules();
             _log.Info($"Imported {imported.Rules.Count} rule(s) from {Path.GetFileName(dlg.FileName)}.");
             Refresh();
         }
