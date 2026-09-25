@@ -3,12 +3,20 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>ProcessBooster.App</RootNamespace>
     <AssemblyName>ProcessBooster</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <!-- WinForms is only used by TrayIcon.cs (which imports it explicitly). Keep its global usings out
+       so System.Windows.Forms doesn't clash with WPF's Application/MessageBox/Color elsewhere. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="WPF-UI" Version="3.0.5" />

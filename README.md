@@ -85,6 +85,10 @@ persistent rule or **Apply now** one-off. Live activity log; import/export rules
 I/O, memory, eco, boost, CPU sets, GPU) and whether its process is running. Apply, enable/disable or
 remove rules here, next to a built-in **reference guide** that explains what each setting does.
 
+**Runs in the tray** — closing the window keeps Process Booster running in the system tray so your
+rules stay enforced. Right-click the tray icon to **Show** it, toggle **Start with Windows** (a
+logon task with highest privileges, so it starts elevated with no UAC nag), or **Exit**.
+
 **Info tabs:**
 
 | | | |

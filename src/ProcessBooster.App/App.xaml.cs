@@ -17,6 +17,9 @@ public partial class App : Application
     private static readonly string StartupLog = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ProcessBooster", "startup.log");
 
+    private TrayIcon? _tray;
+    private bool _exiting;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -72,8 +75,34 @@ public partial class App : Application
 
         var window = new MainWindow { DataContext = vm };
         MainWindow = window;
+
+        // Live in the system tray: closing the window hides it (rules keep being enforced); the tray
+        // menu offers Show / Start-with-Windows / Exit.
+        _tray = new TrayIcon(window, RequestExit);
+        var hintShown = false;
+        window.Closing += (_, e) =>
+        {
+            if (_exiting) return;
+            e.Cancel = true;
+            window.Hide();
+            if (!hintShown) { _tray.ShowRunningHint(); hintShown = true; }
+        };
+
         window.Show();
         vm.Start();
+    }
+
+    /// <summary>Real quit (from the tray "Exit"): let the window actually close, then shut down.</summary>
+    private void RequestExit()
+    {
+        _exiting = true;
+        Shutdown();
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _tray?.Dispose();
+        base.OnExit(e);
     }
 
     private bool _errorShown;
