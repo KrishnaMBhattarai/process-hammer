@@ -61,7 +61,7 @@ public partial class App : Application
         try { config = store.Load(); }
         catch (Exception ex) { log.Error($"Config load failed; starting empty: {ex.Message}"); config = new AppConfig(); }
 
-        var engine = new RuleEngine(() => config, inspector, controller, log);
+        var engine = new RuleEngine(() => config, inspector.Snapshot, controller.ApplyRule, log);
         var monitor = new LiveMonitor();
         var power = new PowerService();
 

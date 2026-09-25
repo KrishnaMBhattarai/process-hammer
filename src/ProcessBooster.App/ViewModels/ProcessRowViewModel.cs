@@ -40,7 +40,6 @@ public sealed class ProcessRowViewModel : ViewModelBase
     public string WorkingSet { get => _workingSet; private set => SetField(ref _workingSet, value); }
     public int Threads { get => _threads; private set => SetField(ref _threads, value); }
     public string? Rule { get => _rule; set => SetField(ref _rule, value); }
-    public bool HasRule => !string.IsNullOrEmpty(_rule);
 
     /// <summary>Raw affinity bitmask (null/0 = all cores) — drives the affinity checkbox list.</summary>
     public ulong? AffinityMaskRaw { get => _affinityRaw; private set => SetField(ref _affinityRaw, value); }
@@ -71,7 +70,6 @@ public sealed class ProcessRowViewModel : ViewModelBase
         WorkingSet = FormatBytes(s.WorkingSetBytes);
         Threads = s.ThreadCount;
         Rule = s.GovernedByRule;
-        Raise(nameof(HasRule));
     }
 
     private static string FormatBytes(long bytes) => bytes switch

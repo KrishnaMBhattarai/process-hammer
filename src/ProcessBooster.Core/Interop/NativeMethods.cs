@@ -92,6 +92,9 @@ internal static class NativeMethods
     internal static extern bool SetProcessDefaultCpuSets(SafeProcessHandle handle, uint[]? cpuSetIds, uint count);
 
     [DllImport("kernel32.dll", SetLastError = true)]
+    internal static extern bool GetProcessDefaultCpuSets(SafeProcessHandle handle, uint[]? cpuSetIds, uint count, out uint requiredIdCount);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
     internal static extern bool GetSystemCpuSetInformation(
         IntPtr information, uint bufferLength, out uint returnedLength, SafeProcessHandle process, uint flags);
 
@@ -102,16 +105,12 @@ internal static class NativeMethods
     [DllImport("ntdll.dll")]
     internal static extern int NtQueryInformationProcess(SafeProcessHandle handle, int infoClass, ref int info, int length, IntPtr returnLength);
 
-    // gdi32: GPU scheduling priority class.
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct D3DKMT_SETPROCESSSCHEDULINGPRIORITYCLASS
-    {
-        public IntPtr hProcess;
-        public int PriorityClass;
-    }
-
+    // gdi32: GPU scheduling priority class (set + read).
     [DllImport("gdi32.dll")]
     internal static extern int D3DKMTSetProcessSchedulingPriorityClass(IntPtr hProcess, int priorityClass);
+
+    [DllImport("gdi32.dll")]
+    internal static extern int D3DKMTGetProcessSchedulingPriorityClass(IntPtr hProcess, out int priorityClass);
 
     // ---- working-set trim (psapi, exported from kernel32 as K32*) ----
     [DllImport("kernel32.dll", SetLastError = true)]

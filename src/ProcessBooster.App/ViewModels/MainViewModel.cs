@@ -49,6 +49,17 @@ public sealed class MainViewModel : ViewModelBase
     public ObservableCollection<MenuOptionItem> MemoryMenu { get; } = new();
     public ObservableCollection<MenuOptionItem> EfficiencyMenu { get; } = new();
     public ObservableCollection<MenuOptionItem> BoostMenu { get; } = new();
+    public ObservableCollection<MenuOptionItem> CpuSetMenu { get; } = new();
+    public ObservableCollection<MenuOptionItem> GpuSchedulingMenu { get; } = new();
+    public ObservableCollection<MenuOptionItem> GpuPreferenceMenu { get; } = new();
+
+    // Current per-process state that isn't in the live table (read once when a row is selected).
+    private ProcessController.CurrentExtras _extras;
+
+    // Affinity-preset checkmarks (which of All / P-cores / E-cores matches the current mask).
+    public bool AffinityIsAllCores => CurrentAffinityPresetKey() == "all";
+    public bool AffinityIsPerformance => CurrentAffinityPresetKey() == "p";
+    public bool AffinityIsEfficiency => CurrentAffinityPresetKey() == "e";
 
     // Booster Rules tab.
     public ObservableCollection<RuleRowViewModel> BoosterRules { get; } = new();
@@ -59,7 +70,6 @@ public sealed class MainViewModel : ViewModelBase
         get => _selectedRule;
         set { if (SetField(ref _selectedRule, value)) RaiseRuleCommands(); }
     }
-    private readonly LiveMonitor _monitor;
     private readonly ITab?[] _tabByIndex;
 
     public HardwareTabViewModel SystemTab { get; }
@@ -86,18 +96,11 @@ public sealed class MainViewModel : ViewModelBase
     public RelayCommand ImportCommand { get; }
     public RelayCommand ExportCommand { get; }
     public RelayCommand RefreshCommand { get; }
-    public RelayCommand QuickPriorityCommand { get; }
-    public RelayCommand QuickEfficiencyCommand { get; }
     public RelayCommand CopySpecsCommand { get; }
     public RelayCommand ExportReportCommand { get; }
 
-    // Right-click boosting actions.
-    public RelayCommand QuickIoCommand { get; }
-    public RelayCommand QuickMemoryCommand { get; }
-    public RelayCommand QuickGpuSchedulingCommand { get; }
-    public RelayCommand QuickGpuPreferenceCommand { get; }
-    public RelayCommand QuickBoostCommand { get; }
-    public RelayCommand QuickCpuSetCommand { get; }
+    // Right-click boosting actions. (CPU priority / I/O / memory / efficiency / boost / CPU sets /
+    // GPU priority / GPU preference use the checkable menu collections, so no commands here.)
     public RelayCommand AffinityPresetCommand { get; }
     public RelayCommand TrimMemoryCommand { get; }
     public RelayCommand CopyRuleCommand { get; }
@@ -117,7 +120,7 @@ public sealed class MainViewModel : ViewModelBase
         PowerService power)
     {
         _config = config; _store = store; _inspector = inspector;
-        _controller = controller; _engine = engine; _log = log; _monitor = monitor; _power = power;
+        _controller = controller; _engine = engine; _log = log; _power = power;
         _topology = topology;
 
         Editor = new RuleEditorViewModel(topology);
@@ -218,17 +221,9 @@ public sealed class MainViewModel : ViewModelBase
         ImportCommand = new RelayCommand(_ => ImportConfig());
         ExportCommand = new RelayCommand(_ => ExportConfig());
         RefreshCommand = new RelayCommand(_ => Refresh());
-        QuickPriorityCommand = new RelayCommand(QuickPriority, _ => SelectedProcess is not null);
-        QuickEfficiencyCommand = new RelayCommand(QuickEfficiency, _ => SelectedProcess is not null);
         CopySpecsCommand = new RelayCommand(_ => CopySpecs());
         ExportReportCommand = new RelayCommand(_ => ExportReport());
 
-        QuickIoCommand = new RelayCommand(QuickIo);
-        QuickMemoryCommand = new RelayCommand(QuickMemory);
-        QuickGpuSchedulingCommand = new RelayCommand(QuickGpuScheduling);
-        QuickGpuPreferenceCommand = new RelayCommand(QuickGpuPreference);
-        QuickBoostCommand = new RelayCommand(QuickBoost);
-        QuickCpuSetCommand = new RelayCommand(QuickCpuSet);
         AffinityPresetCommand = new RelayCommand(ApplyAffinityPreset);
         TrimMemoryCommand = new RelayCommand(_ => TrimMemory());
         CopyRuleCommand = new RelayCommand(_ => CopyRule());
@@ -250,6 +245,11 @@ public sealed class MainViewModel : ViewModelBase
         EfficiencyMenu.Add(MenuItem("Off (system-managed)", false, QuickEfficiency));
         BoostMenu.Add(MenuItem("Enabled", true, QuickBoostEnabled));   // Value = "boost enabled?" for the checkmark
         BoostMenu.Add(MenuItem("Disabled", false, QuickBoostEnabled));
+        CpuSetMenu.Add(MenuItem("All cores", CpuSetSelection.All, QuickCpuSet));
+        CpuSetMenu.Add(MenuItem("Performance cores", CpuSetSelection.PerformanceCores, QuickCpuSet));
+        CpuSetMenu.Add(MenuItem("Efficiency cores", CpuSetSelection.EfficiencyCores, QuickCpuSet));
+        foreach (GpuSchedulingPriority v in Enum.GetValues<GpuSchedulingPriority>()) GpuSchedulingMenu.Add(MenuItem(Humanize(v.ToString()), v, QuickGpuScheduling));
+        foreach (GpuPreference v in Enum.GetValues<GpuPreference>()) GpuPreferenceMenu.Add(MenuItem(Humanize(v.ToString()), v, QuickGpuPreference));
 
         // One checkbox per logical CPU for the right-click affinity list.
         for (var i = 0; i < _cpuCount; i++)
@@ -342,6 +342,9 @@ public sealed class MainViewModel : ViewModelBase
         set
         {
             if (!SetField(ref _selected, value)) return;
+            // Read the current settings that aren't in the live table (CPU sets, GPU priority/preference)
+            // once per selection, so both the menu checkmarks and the editor reflect reality.
+            _extras = value is null ? default : _controller.ReadCurrentExtras(value.Pid, value.ExePath);
             RefreshAffinityCores(value?.AffinityMaskRaw);
             RefreshMenuChecks();
             if (value is null) Editor.Clear();
@@ -359,7 +362,10 @@ public sealed class MainViewModel : ViewModelBase
                         if (t.Result is { } path && SelectedProcess?.Pid == pid)
                         {
                             value.ExePath = path;
+                            _extras = _controller.ReadCurrentExtras(pid, path); // now GPU preference is readable
                             Editor.SetTarget(name, pid, path);
+                            Editor.LoadFrom(FindRule(name), CurrentOf(value));
+                            RefreshMenuChecks();
                         }
                     }, TaskScheduler.FromCurrentSynchronizationContext());
                 }
@@ -503,13 +509,6 @@ public sealed class MainViewModel : ViewModelBase
         Act(p, _controller.SetGpuPreference(p.ExePath, g));
     }
 
-    private void QuickBoost(object? param)
-    {
-        if (SelectedProcess is not { } p) return;
-        var disabled = string.Equals(param?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
-        Act(p, _controller.SetPriorityBoostDisabled(p.Pid, disabled));
-    }
-
     private void QuickCpuSet(object? param)
     {
         if (SelectedProcess is { } p && param is CpuSetSelection sel) Act(p, _controller.SetCpuSets(p.Pid, sel, null));
@@ -522,9 +521,26 @@ public sealed class MainViewModel : ViewModelBase
         Act(p, _controller.SetPriorityBoostDisabled(p.Pid, disabled: !enabled));
     }
 
-    /// <summary>Wrap an apply action so the menu checkmarks refresh right after it runs.</summary>
+    /// <summary>Wrap an apply action so the checkmarks re-read fresh state right after it runs.</summary>
     private MenuOptionItem MenuItem(string label, object? value, Action<object?> apply) =>
-        new(label, value, o => { apply(o); RefreshMenuChecks(); });
+        new(label, value, o => { apply(o); RefreshSelectedState(); });
+
+    /// <summary>Re-read the selected process's live settings from the OS, then refresh all checkmarks.</summary>
+    private void RefreshSelectedState()
+    {
+        if (SelectedProcess is { } p)
+        {
+            _extras = _controller.ReadCurrentExtras(p.Pid, p.ExePath);
+            try
+            {
+                using var proc = System.Diagnostics.Process.GetProcessById(p.Pid);
+                p.Update(_inspector.Read(proc), p.CpuPercent);
+            }
+            catch { /* process may have exited */ }
+            RefreshAffinityCores(p.AffinityMaskRaw);
+        }
+        RefreshMenuChecks();
+    }
 
     /// <summary>Tick the menu item matching each current setting on the selected process.</summary>
     private void RefreshMenuChecks()
@@ -535,6 +551,32 @@ public sealed class MainViewModel : ViewModelBase
         SetChecks(MemoryMenu, p?.MemoryRaw);
         SetChecks(EfficiencyMenu, p?.EcoRaw);
         SetChecks(BoostMenu, p?.BoostEnabledRaw);
+        SetChecks(CpuSetMenu, IsPresetCpuSet(_extras.CpuSets) ? _extras.CpuSets : null);
+        SetChecks(GpuSchedulingMenu, _extras.GpuScheduling);
+        SetChecks(GpuPreferenceMenu, _extras.GpuPreference);
+        Raise(nameof(AffinityIsAllCores));
+        Raise(nameof(AffinityIsPerformance));
+        Raise(nameof(AffinityIsEfficiency));
+    }
+
+    private static bool IsPresetCpuSet(CpuSetSelection? s) =>
+        s is CpuSetSelection.All or CpuSetSelection.PerformanceCores or CpuSetSelection.EfficiencyCores;
+
+    /// <summary>
+    /// Which affinity preset ("all"/"p"/"e") matches the current core selection, if any. Reads the
+    /// checkbox state (the live source of truth for affinity in the menu), so it stays correct as the
+    /// user ticks cores or picks a preset.
+    /// </summary>
+    private string? CurrentAffinityPresetKey()
+    {
+        if (SelectedProcess is null) return null;
+        ulong mask = 0;
+        foreach (var c in AffinityCores) if (c.IsChecked) mask |= 1UL << c.Index;
+        if (mask == 0) mask = AllCoresMask();
+        if (mask == AllCoresMask()) return "all";
+        if (_topology.IsHybrid && mask == CoreClassMask(performance: true)) return "p";
+        if (_topology.IsHybrid && mask == CoreClassMask(performance: false)) return "e";
+        return null;
     }
 
     private static void SetChecks(IEnumerable<MenuOptionItem> items, object? current)
@@ -577,6 +619,10 @@ public sealed class MainViewModel : ViewModelBase
         foreach (var c in AffinityCores) if (c.IsChecked) mask |= 1UL << c.Index;
         if (mask == 0) mask = AllCoresMask(); // unchecking everything = all cores
         Act(p, _controller.SetAffinity(p.Pid, mask));
+        // Update the affinity-preset checkmarks (but not the checkboxes the user is toggling).
+        Raise(nameof(AffinityIsAllCores));
+        Raise(nameof(AffinityIsPerformance));
+        Raise(nameof(AffinityIsEfficiency));
     }
 
     private ulong CoreClassMask(bool performance) => AffinityPresets.ClassMask(_topology.Sets, performance, _cpuCount);
@@ -595,6 +641,9 @@ public sealed class MainViewModel : ViewModelBase
         if (which == "e" && !_topology.IsHybrid) { _log.Warn($"{p.Name}: no separate efficiency cores on this CPU."); return; }
         Act(p, _controller.SetAffinity(p.Pid, mask));
         RefreshAffinityCores(mask); // reflect the preset in the checkboxes
+        Raise(nameof(AffinityIsAllCores));
+        Raise(nameof(AffinityIsPerformance));
+        Raise(nameof(AffinityIsEfficiency));
     }
 
     // ---- lifecycle actions ----
@@ -749,7 +798,6 @@ public sealed class MainViewModel : ViewModelBase
             _config.Rules.Clear();
             _config.Rules.AddRange(imported.Rules);
             _config.PollSeconds = imported.PollSeconds;
-            _config.RestorePowerPlan = imported.RestorePowerPlan;
             Persist();
             RebuildBoosterRules();
             _log.Info($"Imported {imported.Rules.Count} rule(s) from {Path.GetFileName(dlg.FileName)}.");
@@ -799,9 +847,10 @@ public sealed class MainViewModel : ViewModelBase
             || r.Pid.ToString().Contains(_search);
     }
 
-    /// <summary>Snapshot a process row's live settings for the editor's "show current state" pre-select.</summary>
-    private static CurrentState CurrentOf(ProcessRowViewModel p) =>
-        new(p.CpuPriorityRaw, p.AffinityMaskRaw, p.IoRaw, p.MemoryRaw, p.EcoRaw, p.BoostEnabledRaw);
+    /// <summary>Snapshot a process row's live settings (+ the just-read extras) for the editor pre-select.</summary>
+    private CurrentState CurrentOf(ProcessRowViewModel p) =>
+        new(p.CpuPriorityRaw, p.AffinityMaskRaw, p.IoRaw, p.MemoryRaw, p.EcoRaw, p.BoostEnabledRaw,
+            _extras.CpuSets, _extras.GpuScheduling, _extras.GpuPreference);
 
     private ProcessRule? FindRule(string name) =>
         _config.Rules.FirstOrDefault(r => r.NormalizedMatch == ProcessRule.Normalize(name));
@@ -819,8 +868,6 @@ public sealed class MainViewModel : ViewModelBase
         ApplyNowCommand.RaiseCanExecuteChanged();
         SaveRuleCommand.RaiseCanExecuteChanged();
         RemoveRuleCommand.RaiseCanExecuteChanged();
-        QuickPriorityCommand.RaiseCanExecuteChanged();
-        QuickEfficiencyCommand.RaiseCanExecuteChanged();
     }
 
     private void OnLogged(LogEntry entry)

@@ -17,6 +17,9 @@ public sealed class CpuTopology
 
     public CpuTopology() => _sets = new(Query);
 
+    /// <summary>Test/DI seam: build a topology from a known set list instead of querying the OS.</summary>
+    public CpuTopology(IReadOnlyList<CpuSetInfo> sets) => _sets = new(() => sets);
+
     public IReadOnlyList<CpuSetInfo> Sets => _sets.Value;
 
     public bool IsHybrid => Sets.Select(s => s.EfficiencyClass).Distinct().Count() > 1;
