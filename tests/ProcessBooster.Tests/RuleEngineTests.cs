@@ -104,6 +104,34 @@ public class RuleEngineTests
     }
 
     [Fact]
+    public void ApplyOnce_ResolvesExePath_ForGpuPreferenceRules()
+    {
+        var config = ConfigWith(new ProcessRule { Match = "mygame", GpuPreference = GpuPreference.HighPerformance });
+        string? received = "SENTINEL";
+        IReadOnlyList<ActionResult> Apply(ProcessRule r, int pid, string? exe) { received = exe; return new[] { new ActionResult("GpuPreference", ActionStatus.Applied) }; }
+        var engine = new RuleEngine(() => config, () => new[] { Snap(1, "mygame") }, Apply, new ActionLog(),
+            resolveExePath: pid => $"C:\\games\\{pid}.exe");
+
+        engine.ApplyOnce(config);
+
+        Assert.Equal("C:\\games\\1.exe", received); // engine resolved the path the snapshot lacked
+    }
+
+    [Fact]
+    public void ApplyOnce_SkipsExePathResolution_WhenRuleHasNoGpuPreference()
+    {
+        var config = ConfigWith(new ProcessRule { Match = "mygame", CpuPriority = CpuPriority.High });
+        var resolverCalled = false;
+        IReadOnlyList<ActionResult> Apply(ProcessRule r, int pid, string? exe) => new[] { new ActionResult("CpuPriority", ActionStatus.Applied) };
+        var engine = new RuleEngine(() => config, () => new[] { Snap(1, "mygame") }, Apply, new ActionLog(),
+            resolveExePath: _ => { resolverCalled = true; return "x"; });
+
+        engine.ApplyOnce(config);
+
+        Assert.False(resolverCalled); // no GPU-pref action → no (potentially slow) path lookup
+    }
+
+    [Fact]
     public void ApplyOnce_LogsFailuresAsWarnings()
     {
         var config = ConfigWith(new ProcessRule { Match = "mygame", CpuPriority = CpuPriority.High });
