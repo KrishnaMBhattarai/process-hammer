@@ -9,11 +9,14 @@ $proj = "src/ProcessBooster.App/ProcessBooster.App.csproj"
 $desktop = [Environment]::GetFolderPath("Desktop")
 $version = ([xml](Get-Content "$root\Directory.Build.props")).Project.PropertyGroup.Version
 $exeName = "ProcessBooster_SelfContained_v$version.exe"
+$folderExeName = "ProcessBooster_v$version.exe"
 
 Get-Process ProcessBooster, "ProcessBooster_SelfContained_v$version" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
-Write-Host "1/2  runtime-dependent folder -> $desktop\ProcessBooster" -ForegroundColor Cyan
+Write-Host "1/2  runtime-dependent folder -> $desktop\ProcessBooster\$folderExeName" -ForegroundColor Cyan
 dotnet publish $proj -c Release -o "$desktop\ProcessBooster" --nologo
+# Version-suffix the apphost exe too (it still launches ProcessBooster.dll by assembly name).
+Rename-Item "$desktop\ProcessBooster\ProcessBooster.exe" $folderExeName -Force
 
 Write-Host "2/2  self-contained single file -> $desktop\ProcessBooster-portable\$exeName" -ForegroundColor Cyan
 $port = "$desktop\ProcessBooster-portable"
