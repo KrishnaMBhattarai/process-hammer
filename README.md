@@ -123,8 +123,15 @@ rules). Right-click any process for the full tuning menu:
 
 Every option shows a **checkmark on what's currently applied**. The right-hand **Rule** panel is a
 **live mirror** of the same state — change a setting in either place and the other updates instantly.
-Hit **Apply** to keep those settings enforced: they're saved as a rule and re-applied automatically,
-including when the app relaunches. Live activity log; import/export rules as JSON.
+
+> **Live tweak vs. saved rule — the one thing to know.** Changing a setting from the **right-click
+> menu** takes effect **immediately, but only on that one running process** — it's a one-off live
+> tweak that is **not saved**. To make it stick, hit **Apply** in the Rule panel: that writes a
+> **persistent rule** (matched by process name) which Process Hammer then re-applies automatically to
+> *every* matching process, and keeps re-applying after the process or the app restarts. In short:
+> **right-click = try it now, Apply = make it permanent.**
+
+Live activity log; import/export rules as JSON.
 
 **Rules** — every saved rule in one place, showing exactly what it applies (priority, cores, I/O,
 memory, eco, boost, CPU sets, GPU) and whether its process is running. Apply, enable/disable or remove
