@@ -12,6 +12,7 @@ public sealed class RuleEngine : IDisposable
 {
     private readonly Func<IReadOnlyList<ProcessSnapshot>> _snapshot;
     private readonly Func<ProcessRule, int, string?, IReadOnlyList<ActionResult>> _applyRule;
+    private readonly Func<int, string?>? _resolveExePath;
     private readonly ActionLog _log;
     private readonly Func<AppConfig> _configProvider;
 
@@ -29,12 +30,14 @@ public sealed class RuleEngine : IDisposable
         Func<AppConfig> configProvider,
         Func<IReadOnlyList<ProcessSnapshot>> snapshot,
         Func<ProcessRule, int, string?, IReadOnlyList<ActionResult>> applyRule,
-        ActionLog log)
+        ActionLog log,
+        Func<int, string?>? resolveExePath = null)
     {
         _configProvider = configProvider;
         _snapshot = snapshot;
         _applyRule = applyRule;
         _log = log;
+        _resolveExePath = resolveExePath;
     }
 
     public bool IsRunning => _loop is { IsCompleted: false };
@@ -88,7 +91,14 @@ public sealed class RuleEngine : IDisposable
             var key = (snap.Pid, rule.Match);
             var firstTime = _applied.Add(key);
 
-            var results = _applyRule(rule, snap.Pid, snap.ExePath);
+            // GPU preference is a per-exe registry write, so it needs the full image path. The bulk
+            // snapshot omits it (too slow for every process), so resolve it here only for the few
+            // processes that actually match a rule that sets it.
+            var exePath = snap.ExePath;
+            if (exePath is null && rule.GpuPreference is not null && _resolveExePath is not null)
+                exePath = _resolveExePath(snap.Pid);
+
+            var results = _applyRule(rule, snap.Pid, exePath);
             if (!firstTime) continue; // already logged this pid/rule; keep applying quietly
 
             foreach (var r in results)
