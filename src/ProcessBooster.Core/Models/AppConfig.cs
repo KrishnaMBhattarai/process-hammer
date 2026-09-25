@@ -14,9 +14,6 @@ public sealed class AppConfig
     /// <summary>How often (seconds) the engine re-scans processes and re-applies rules.</summary>
     public int PollSeconds { get; set; } = 4;
 
-    /// <summary>Restore the previous power plan when no rule process is running.</summary>
-    public bool RestorePowerPlan { get; set; } = true;
-
     public List<ProcessRule> Rules { get; set; } = new();
 
     public AppConfig Clone()

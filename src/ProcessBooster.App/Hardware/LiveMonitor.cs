@@ -19,7 +19,6 @@ public sealed class LiveMonitor : IDisposable
 
     public SensorSnapshot Sensors { get; private set; } = new();
     public IReadOnlyList<SensorGroup> SensorGroups => _sensors.AllGroups;
-    public bool SensorsAvailable => _sensors.IsAvailable;
     public string? SensorNote => _sensors.IsAvailable ? null : _sensors.Unavailable;
 
     public double NetDownMbps { get; private set; }

@@ -12,7 +12,6 @@ public sealed class ProcessSnapshot
 
     public CpuPriority? CpuPriority { get; init; }
     public ulong? AffinityMask { get; init; }
-    public int AffinityCoreCount { get; init; }
     public IoPriority? IoPriority { get; init; }
     public MemoryPriority? MemoryPriority { get; init; }
     public bool? EfficiencyMode { get; init; }

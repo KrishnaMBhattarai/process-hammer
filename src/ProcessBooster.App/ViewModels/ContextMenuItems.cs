@@ -68,7 +68,8 @@ public sealed class PowerProfileItem : ViewModelBase
 /// (instead of "Leave unchanged"). Fields we don't read live stay null.
 /// </summary>
 public readonly record struct CurrentState(
-    CpuPriority? Cpu, ulong? Affinity, IoPriority? Io, MemoryPriority? Memory, bool? Eco, bool? BoostEnabled);
+    CpuPriority? Cpu, ulong? Affinity, IoPriority? Io, MemoryPriority? Memory, bool? Eco, bool? BoostEnabled,
+    CpuSetSelection? CpuSets = null, GpuSchedulingPriority? GpuScheduling = null, GpuPreference? GpuPreference = null);
 
 /// <summary>One row in the Booster Rules tab: a saved rule summarised for display.</summary>
 public sealed class RuleRowViewModel : ViewModelBase
@@ -94,6 +95,5 @@ public sealed class RuleRowViewModel : ViewModelBase
     public string CpuSets => Rule.CpuSetSelection == CpuSetSelection.Unset ? "—" : Rule.CpuSetSelection.ToString();
     public string GpuPref => Rule.GpuPreference?.ToString() ?? "—";
     public string GpuSched => Rule.GpuSchedulingPriority?.ToString() ?? "—";
-    public string PowerPlan => string.IsNullOrWhiteSpace(Rule.PowerPlan) ? "—" : Rule.PowerPlan!;
     public string Note => Rule.Note ?? "";
 }

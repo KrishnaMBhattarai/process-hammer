@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using ProcessBooster.Core.Interop;
 using ProcessBooster.Core.Models;
-using ProcessBooster.Core.Util;
 
 namespace ProcessBooster.Core.Services;
 
@@ -35,7 +34,7 @@ public sealed class ProcessInspector
         try { threads = p.Threads.Count; } catch { }
         try { cpu = p.TotalProcessorTime; } catch { }
 
-        CpuPriority? prio = null; ulong? affinity = null; int coreCount = 0;
+        CpuPriority? prio = null; ulong? affinity = null;
         IoPriority? io = null; MemoryPriority? mem = null; bool? eco = null; bool? boost = null;
 
         using (var h = NativeMethods.OpenProcess(NativeMethods.ACCESS_READ, false, p.Id))
@@ -46,10 +45,7 @@ public sealed class ProcessInspector
                 if (pc != 0) prio = ProcessController.FromNative(pc);
 
                 if (NativeMethods.GetProcessAffinityMask(h, out var procMask, out _))
-                {
                     affinity = (ulong)procMask;
-                    coreCount = AffinityMask.CountBits(affinity.Value);
-                }
 
                 if (NativeMethods.GetProcessPriorityBoost(h, out var disabled))
                     boost = !disabled;
@@ -67,7 +63,6 @@ public sealed class ProcessInspector
             ExePath = null,
             CpuPriority = prio,
             AffinityMask = affinity,
-            AffinityCoreCount = coreCount,
             IoPriority = io,
             MemoryPriority = mem,
             EfficiencyMode = eco,

@@ -171,6 +171,51 @@ public sealed class ProcessController
         }
     }
 
+    // ---- reading current per-process state (for menu checkmarks + the rule editor) ----
+
+    /// <summary>A process's current settings that aren't in the live table but drive the menu/editor.</summary>
+    public readonly record struct CurrentExtras(
+        CpuSetSelection? CpuSets, GpuSchedulingPriority? GpuScheduling, GpuPreference? GpuPreference);
+
+    public CurrentExtras ReadCurrentExtras(int pid, string? exePath) =>
+        new(ReadCpuSets(pid), ReadGpuScheduling(pid), ReadGpuPreference(exePath));
+
+    /// <summary>Current default CPU-set assignment mapped back to All / Performance / Efficiency / Custom.</summary>
+    public CpuSetSelection? ReadCpuSets(int pid)
+    {
+        using var h = Open(pid, NativeMethods.ACCESS_READ);
+        if (h.IsInvalid) return null;
+        // Size probe: with a null/empty buffer this returns false when sets exist, but always fills
+        // requiredIdCount (it returns true with count 0 when the process has no default CPU sets).
+        NativeMethods.GetProcessDefaultCpuSets(h, null, 0, out var required);
+        if (required == 0) return CpuSetSelection.All; // no restriction = all cores
+        var ids = new uint[required];
+        if (!NativeMethods.GetProcessDefaultCpuSets(h, ids, required, out _)) return null;
+        return MapCpuSetIds(ids);
+    }
+
+    private CpuSetSelection MapCpuSetIds(uint[] ids)
+    {
+        var sorted = ids.OrderBy(x => x).ToArray();
+        bool Matches(uint[] a) => a.Length == sorted.Length && a.OrderBy(x => x).SequenceEqual(sorted);
+        if (Matches(_topology.PerformanceCoreSetIds())) return CpuSetSelection.PerformanceCores;
+        if (_topology.IsHybrid && Matches(_topology.EfficiencyCoreSetIds())) return CpuSetSelection.EfficiencyCores;
+        return CpuSetSelection.Custom;
+    }
+
+    /// <summary>Current GPU scheduling priority class, or null if it can't be read.</summary>
+    public GpuSchedulingPriority? ReadGpuScheduling(int pid)
+    {
+        using var h = Open(pid, NativeMethods.ACCESS_READ);
+        if (h.IsInvalid) return null;
+        var status = NativeMethods.D3DKMTGetProcessSchedulingPriorityClass(h.DangerousGetHandle(), out var cls);
+        return status == 0 && Enum.IsDefined(typeof(GpuSchedulingPriority), cls) ? (GpuSchedulingPriority)cls : null;
+    }
+
+    /// <summary>Current per-exe GPU preference from the registry (SystemDefault if none set).</summary>
+    public GpuPreference? ReadGpuPreference(string? exePath) =>
+        string.IsNullOrWhiteSpace(exePath) ? null : _gpuPrefs.Get(exePath!);
+
     // ---- one-shot lifecycle actions (not part of a saved rule) ----
 
     /// <summary>Empty the process working set (RAM trim). Pages are faulted back in on demand.</summary>

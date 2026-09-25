@@ -362,33 +362,21 @@
                                         <MenuItem Header="CPU priority" ItemsSource="{Binding CpuPriorityMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}" />
                                         <MenuItem Header="CPU affinity — hard limit"
                                                   ToolTip="Strict: the process can ONLY run on the ticked cores. Best for firmly pinning a game to Performance cores.">
-                                            <MenuItem Header="All cores (P + E)" Command="{Binding AffinityPresetCommand}" CommandParameter="all" />
-                                            <MenuItem Header="Performance cores (P)" Command="{Binding AffinityPresetCommand}" CommandParameter="p" />
-                                            <MenuItem Header="Efficiency cores (E)" Command="{Binding AffinityPresetCommand}" CommandParameter="e" />
+                                            <MenuItem Header="All cores (P + E)" IsCheckable="True" IsChecked="{Binding AffinityIsAllCores, Mode=OneWay}"
+                                                      Command="{Binding AffinityPresetCommand}" CommandParameter="all" />
+                                            <MenuItem Header="Performance cores (P)" IsCheckable="True" IsChecked="{Binding AffinityIsPerformance, Mode=OneWay}"
+                                                      Command="{Binding AffinityPresetCommand}" CommandParameter="p" />
+                                            <MenuItem Header="Efficiency cores (E)" IsCheckable="True" IsChecked="{Binding AffinityIsEfficiency, Mode=OneWay}"
+                                                      Command="{Binding AffinityPresetCommand}" CommandParameter="e" />
                                             <Separator />
                                             <MenuItem Header="Choose cores…" ItemsSource="{Binding AffinityCores}" ItemContainerStyle="{StaticResource CoreMenuItem}" />
                                         </MenuItem>
-                                        <MenuItem Header="CPU sets — preferred cores"
-                                                  ToolTip="Softer: asks Windows to favor these cores but still allow others when needed (the mechanism Game Mode uses).">
-                                            <MenuItem Header="All cores" Command="{Binding QuickCpuSetCommand}" CommandParameter="{x:Static core:CpuSetSelection.All}" />
-                                            <MenuItem Header="Performance cores" Command="{Binding QuickCpuSetCommand}" CommandParameter="{x:Static core:CpuSetSelection.PerformanceCores}" />
-                                            <MenuItem Header="Efficiency cores" Command="{Binding QuickCpuSetCommand}" CommandParameter="{x:Static core:CpuSetSelection.EfficiencyCores}" />
-                                        </MenuItem>
+                                        <MenuItem Header="CPU sets — preferred cores" ItemsSource="{Binding CpuSetMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}"
+                                                  ToolTip="Softer: asks Windows to favor these cores but still allow others when needed (the mechanism Game Mode uses)." />
                                         <MenuItem Header="I/O priority" ItemsSource="{Binding IoMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}" />
                                         <MenuItem Header="Memory priority" ItemsSource="{Binding MemoryMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}" />
-                                        <MenuItem Header="GPU priority">
-                                            <MenuItem Header="Idle" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.Idle}" />
-                                            <MenuItem Header="Below normal" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.BelowNormal}" />
-                                            <MenuItem Header="Normal" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.Normal}" />
-                                            <MenuItem Header="Above normal" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.AboveNormal}" />
-                                            <MenuItem Header="High" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.High}" />
-                                            <MenuItem Header="Realtime" Command="{Binding QuickGpuSchedulingCommand}" CommandParameter="{x:Static core:GpuSchedulingPriority.Realtime}" />
-                                        </MenuItem>
-                                        <MenuItem Header="GPU preference (applies on relaunch)">
-                                            <MenuItem Header="System default" Command="{Binding QuickGpuPreferenceCommand}" CommandParameter="{x:Static core:GpuPreference.SystemDefault}" />
-                                            <MenuItem Header="Power saving" Command="{Binding QuickGpuPreferenceCommand}" CommandParameter="{x:Static core:GpuPreference.PowerSaving}" />
-                                            <MenuItem Header="High performance" Command="{Binding QuickGpuPreferenceCommand}" CommandParameter="{x:Static core:GpuPreference.HighPerformance}" />
-                                        </MenuItem>
+                                        <MenuItem Header="GPU priority" ItemsSource="{Binding GpuSchedulingMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}" />
+                                        <MenuItem Header="GPU preference (applies on relaunch)" ItemsSource="{Binding GpuPreferenceMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}" />
                                         <MenuItem Header="Efficiency mode" ItemsSource="{Binding EfficiencyMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}" />
                                         <MenuItem Header="Priority boost" ItemsSource="{Binding BoostMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}" />
                                         <MenuItem Header="Power profile" ItemsSource="{Binding PowerProfiles}">
@@ -587,7 +575,6 @@
                                 <DataGridTextColumn Header="CPU sets" Binding="{Binding CpuSets}" Width="1*" />
                                 <DataGridTextColumn Header="GPU pref" Binding="{Binding GpuPref}" Width="1*" />
                                 <DataGridTextColumn Header="GPU prio" Binding="{Binding GpuSched}" Width="1*" />
-                                <DataGridTextColumn Header="Power plan" Binding="{Binding PowerPlan}" Width="1*" />
                                 <DataGridTextColumn Header="Note" Binding="{Binding Note}" Width="1.2*" />
                             </DataGrid.Columns>
                             </DataGrid>

@@ -10,8 +10,8 @@ namespace ProcessBooster.Core.Services;
 /// </summary>
 public sealed class RuleEngine : IDisposable
 {
-    private readonly ProcessInspector _inspector;
-    private readonly ProcessController _controller;
+    private readonly Func<IReadOnlyList<ProcessSnapshot>> _snapshot;
+    private readonly Func<ProcessRule, int, string?, IReadOnlyList<ActionResult>> _applyRule;
     private readonly ActionLog _log;
     private readonly Func<AppConfig> _configProvider;
 
@@ -21,11 +21,19 @@ public sealed class RuleEngine : IDisposable
     // Remembers which (pid, rule) we've already applied, to avoid log spam every tick.
     private readonly HashSet<(int Pid, string Rule)> _applied = new();
 
-    public RuleEngine(Func<AppConfig> configProvider, ProcessInspector inspector, ProcessController controller, ActionLog log)
+    /// <summary>
+    /// Takes the snapshot + apply operations as delegates (rather than the concrete inspector/controller)
+    /// so the loop is unit-testable with fakes and stays decoupled from the OS calls.
+    /// </summary>
+    public RuleEngine(
+        Func<AppConfig> configProvider,
+        Func<IReadOnlyList<ProcessSnapshot>> snapshot,
+        Func<ProcessRule, int, string?, IReadOnlyList<ActionResult>> applyRule,
+        ActionLog log)
     {
         _configProvider = configProvider;
-        _inspector = inspector;
-        _controller = controller;
+        _snapshot = snapshot;
+        _applyRule = applyRule;
         _log = log;
     }
 
@@ -70,7 +78,7 @@ public sealed class RuleEngine : IDisposable
     {
         var livePids = new HashSet<int>();
 
-        foreach (var snap in _inspector.Snapshot())
+        foreach (var snap in _snapshot())
         {
             livePids.Add(snap.Pid);
             var rule = RuleMatcher.FirstMatch(config.Rules, snap.Name);
@@ -80,7 +88,7 @@ public sealed class RuleEngine : IDisposable
             var key = (snap.Pid, rule.Match);
             var firstTime = _applied.Add(key);
 
-            var results = _controller.ApplyRule(rule, snap.Pid, snap.ExePath);
+            var results = _applyRule(rule, snap.Pid, snap.ExePath);
             if (!firstTime) continue; // already logged this pid/rule; keep applying quietly
 
             foreach (var r in results)

@@ -23,7 +23,6 @@ public class RuleRowViewModelTests
             CpuSetSelection = CpuSetSelection.PerformanceCores,
             GpuPreference = GpuPreference.HighPerformance,
             GpuSchedulingPriority = GpuSchedulingPriority.High,
-            PowerPlan = "High performance",
             Note = "boost it",
         });
 
@@ -38,7 +37,6 @@ public class RuleRowViewModelTests
         Assert.Equal("PerformanceCores", row.CpuSets);
         Assert.Equal("HighPerformance", row.GpuPref);
         Assert.Equal("High", row.GpuSched);
-        Assert.Equal("High performance", row.PowerPlan);
         Assert.Equal("boost it", row.Note);
     }
 
@@ -57,7 +55,6 @@ public class RuleRowViewModelTests
         Assert.Equal("—", row.CpuSets);
         Assert.Equal("—", row.GpuPref);
         Assert.Equal("—", row.GpuSched);
-        Assert.Equal("—", row.PowerPlan);
         Assert.Equal("", row.Note);
     }
 

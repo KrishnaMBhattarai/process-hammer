@@ -162,14 +162,17 @@ public sealed class RuleEditorViewModel : ViewModelBase
         var c = current ?? default;
         var boostDisabled = rule?.DisablePriorityBoost ?? (c.BoostEnabled is { } en ? !en : (bool?)null);
 
+        var cpuSet = rule is { } r && r.CpuSetSelection != CpuSetSelection.Unset
+            ? r.CpuSetSelection : c.CpuSets ?? CpuSetSelection.Unset;
+
         SelectedCpuPriority = Match(CpuPriorityOptions, rule?.CpuPriority ?? c.Cpu);
         SelectedIo = Match(IoOptions, rule?.IoPriority ?? c.Io);
         SelectedMemory = Match(MemoryOptions, rule?.MemoryPriority ?? c.Memory);
-        SelectedGpuPreference = Match(GpuPreferenceOptions, rule?.GpuPreference);
-        SelectedGpuScheduling = Match(GpuSchedulingOptions, rule?.GpuSchedulingPriority);
+        SelectedGpuPreference = Match(GpuPreferenceOptions, rule?.GpuPreference ?? c.GpuPreference);
+        SelectedGpuScheduling = Match(GpuSchedulingOptions, rule?.GpuSchedulingPriority ?? c.GpuScheduling);
         SelectedEfficiency = Match(EfficiencyOptions, rule?.EfficiencyMode ?? c.Eco);
         SelectedBoost = Match(BoostOptions, boostDisabled);
-        SelectedCpuSet = Match(CpuSetOptions, rule?.CpuSetSelection ?? CpuSetSelection.Unset) ?? CpuSetOptions[0];
+        SelectedCpuSet = Match(CpuSetOptions, cpuSet) ?? CpuSetOptions[0];
 
         var affinity = rule?.AffinityMask is { } m && m != 0 ? m
             : c.Affinity is { } am && am != 0 ? am : (ulong?)null;

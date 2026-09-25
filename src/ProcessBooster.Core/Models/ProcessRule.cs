@@ -39,16 +39,12 @@ public sealed class ProcessRule
     /// <summary>Explicit CPU-set IDs used when <see cref="CpuSetSelection"/> is Custom.</summary>
     public List<uint> CpuSetIds { get; set; } = new();
 
-    /// <summary>Power plan (by name or GUID) to switch to while any rule process is running. Optional.</summary>
-    public string? PowerPlan { get; set; }
-
     /// <summary>Returns true if any action is set (the rule would do something).</summary>
     public bool HasAnyAction =>
         CpuPriority is not null || (AffinityMask is not null && AffinityMask != 0) ||
         IoPriority is not null || MemoryPriority is not null || EfficiencyMode is not null ||
         DisablePriorityBoost is not null || GpuPreference is not null ||
-        GpuSchedulingPriority is not null || CpuSetSelection != CpuSetSelection.Unset ||
-        !string.IsNullOrWhiteSpace(PowerPlan);
+        GpuSchedulingPriority is not null || CpuSetSelection != CpuSetSelection.Unset;
 
     /// <summary>The bare process name without extension, lower-cased, for matching.</summary>
     public string NormalizedMatch => Normalize(Match);
