@@ -90,7 +90,6 @@ public sealed class MainViewModel : ViewModelBase
     public HardwareTabViewModel PowerTab { get; }
     public SensorsTabViewModel SensorsTab { get; }
 
-    public RelayCommand ApplyNowCommand { get; }
     public RelayCommand SaveRuleCommand { get; }
     public RelayCommand RemoveRuleCommand { get; }
     public RelayCommand ImportCommand { get; }
@@ -215,7 +214,6 @@ public sealed class MainViewModel : ViewModelBase
         ProcessView.Filter = FilterProcess;
         ProcessView.SortDescriptions.Add(new SortDescription(nameof(ProcessRowViewModel.Name), ListSortDirection.Ascending));
 
-        ApplyNowCommand = new RelayCommand(_ => ApplyNow(), _ => SelectedProcess is not null);
         SaveRuleCommand = new RelayCommand(_ => SaveRule(), _ => SelectedProcess is not null);
         RemoveRuleCommand = new RelayCommand(_ => RemoveRule(), _ => SelectedProcess is not null && RuleExistsFor(SelectedProcess.Name));
         ImportCommand = new RelayCommand(_ => ImportConfig());
@@ -455,15 +453,6 @@ public sealed class MainViewModel : ViewModelBase
         finally { _refreshing = false; }
     }
 
-    private void ApplyNow()
-    {
-        if (SelectedProcess is not { } p) return;
-        var rule = Editor.BuildRule();
-        if (rule is null) { _log.Warn($"{p.Name}: nothing to apply (no settings chosen)."); return; }
-        var results = _controller.ApplyRule(rule, p.Pid, p.ExePath);
-        foreach (var r in results) _log.Action($"{p.Name} (pid {p.Pid}) {r}");
-    }
-
     // Right-click quick actions — apply immediately to the selected process (one-shot, no rule saved).
     private void QuickPriority(object? param)
     {
@@ -538,6 +527,8 @@ public sealed class MainViewModel : ViewModelBase
             }
             catch { /* process may have exited */ }
             RefreshAffinityCores(p.AffinityMaskRaw);
+            // Keep the Rule panel mirrored to the menu: reload it from the new current state.
+            Editor.LoadFrom(FindRule(p.Name), CurrentOf(p));
         }
         RefreshMenuChecks();
     }
@@ -619,10 +610,7 @@ public sealed class MainViewModel : ViewModelBase
         foreach (var c in AffinityCores) if (c.IsChecked) mask |= 1UL << c.Index;
         if (mask == 0) mask = AllCoresMask(); // unchecking everything = all cores
         Act(p, _controller.SetAffinity(p.Pid, mask));
-        // Update the affinity-preset checkmarks (but not the checkboxes the user is toggling).
-        Raise(nameof(AffinityIsAllCores));
-        Raise(nameof(AffinityIsPerformance));
-        Raise(nameof(AffinityIsEfficiency));
+        RefreshSelectedState(); // mirror to preset checkmarks + the Rule panel
     }
 
     private ulong CoreClassMask(bool performance) => AffinityPresets.ClassMask(_topology.Sets, performance, _cpuCount);
@@ -773,6 +761,7 @@ public sealed class MainViewModel : ViewModelBase
         Persist();
         RebuildBoosterRules();
         RaiseCommands();
+        RefreshSelectedState(); // mirror the just-applied settings back into the menu checkmarks
         Refresh();
     }
 
@@ -865,7 +854,6 @@ public sealed class MainViewModel : ViewModelBase
 
     private void RaiseCommands()
     {
-        ApplyNowCommand.RaiseCanExecuteChanged();
         SaveRuleCommand.RaiseCanExecuteChanged();
         RemoveRuleCommand.RaiseCanExecuteChanged();
     }

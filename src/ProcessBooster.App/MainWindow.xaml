@@ -310,11 +310,6 @@
                             </ui:TextBox.Icon>
                         </ui:TextBox>
                         <StackPanel Grid.Column="1" Orientation="Horizontal">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0"
-                                        ToolTip="When on, Process Booster keeps re-applying your saved rules to matching processes (including new instances as they launch). Turn off to pause enforcement.">
-                                <TextBlock Text="Auto-apply rules" VerticalAlignment="Center" Margin="0,0,8,0" Opacity="0.85" />
-                                <ui:ToggleSwitch IsChecked="{Binding EngineRunning, Mode=TwoWay}" />
-                            </StackPanel>
                             <ui:Button Content="Refresh" Command="{Binding RefreshCommand}" Margin="0,0,8,0" />
                             <ui:Button Content="Import" Command="{Binding ImportCommand}" Margin="0,0,8,0" />
                             <ui:Button Content="Export" Appearance="Primary" Command="{Binding ExportCommand}" />
@@ -465,11 +460,9 @@
                                                 <ComboBox ItemsSource="{Binding Editor.GpuPreferenceOptions}" SelectedItem="{Binding Editor.SelectedGpuPreference, Mode=TwoWay}" />
                                                 <TextBlock Text="GPU scheduling priority" Style="{StaticResource FieldLabel}" />
                                                 <ComboBox ItemsSource="{Binding Editor.GpuSchedulingOptions}" SelectedItem="{Binding Editor.SelectedGpuScheduling, Mode=TwoWay}" />
-                                                <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
-                                                    <ui:Button Content="Apply now" Appearance="Secondary" Command="{Binding ApplyNowCommand}" Margin="0,0,8,0" />
-                                                    <ui:Button Content="Save rule" Appearance="Primary" Command="{Binding SaveRuleCommand}" Margin="0,0,8,0" />
-                                                    <ui:Button Content="Remove" Command="{Binding RemoveRuleCommand}" />
-                                                </StackPanel>
+                                                <ui:Button Content="Apply" Appearance="Primary" Command="{Binding SaveRuleCommand}"
+                                                           HorizontalAlignment="Stretch" Margin="0,18,0,0"
+                                                           ToolTip="Apply these settings to the process and keep them enforced (saved as a rule). Remove a rule via right-click → Remove saved rule." />
                                             </StackPanel>
                                         </StackPanel>
                                     </ScrollViewer>
