@@ -73,8 +73,9 @@ public sealed class SensorService : IDisposable
         var all = new List<(HardwareType Type, ISensor Sensor)>();
         foreach (var hw in _computer.Hardware) Collect(hw, all);
 
-        double? Pick(HardwareType type, SensorType sensor, params string[] nameContains)
+        double? Pick(HardwareType? type, SensorType sensor, params string[] nameContains)
         {
+            if (type is null) return null;
             var matches = all.Where(x => x.Type == type && x.Sensor.SensorType == sensor && x.Sensor.Value is not null).ToList();
             if (matches.Count == 0) return null;
             foreach (var n in nameContains)
@@ -86,8 +87,11 @@ public sealed class SensorService : IDisposable
         }
 
         bool IsGpu(HardwareType t) => t is HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel;
-        var gpuType = all.Select(x => x.Type).FirstOrDefault(IsGpu, HardwareType.GpuNvidia);
-        var gpuName = _computer.Hardware.FirstOrDefault(h => IsGpu(h.HardwareType))?.Name;
+        // Detect the actual GPU vendor live; null when no GPU is present (Pick then returns null, so
+        // every GPU field reads blank — no assumption about which vendor exists).
+        var gpuHardware = _computer.Hardware.FirstOrDefault(h => IsGpu(h.HardwareType));
+        HardwareType? gpuType = gpuHardware?.HardwareType;
+        var gpuName = gpuHardware?.Name;
 
         // Average of all per-core clocks — reflects real load and updates each tick, unlike a single
         // core pinned at its max boost (which looked static).
