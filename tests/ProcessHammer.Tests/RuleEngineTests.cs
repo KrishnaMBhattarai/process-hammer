@@ -66,8 +66,8 @@ public class RuleEngineTests
         engine.ApplyOnce(config);
         engine.ApplyOnce(config);
 
-        Assert.Equal(2, applied.Count);                                   // re-applied both ticks (idempotent enforcement)
-        Assert.Single(log.Recent().Where(e => e.Level == LogLevel.Action)); // logged only the first time
+        Assert.Equal(2, applied.Count);                          // re-applied both ticks (idempotent enforcement)
+        Assert.Single(log.Recent(), e => e.Level == LogLevel.Action); // logged only the first time
     }
 
     [Fact]

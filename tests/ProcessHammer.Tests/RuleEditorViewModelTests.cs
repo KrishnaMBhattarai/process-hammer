@@ -87,6 +87,7 @@ public class RuleEditorViewModelTests
     [Fact]
     public void LoadFrom_AffinitySubset_ChecksMatchingCores()
     {
+        if (Environment.ProcessorCount < 3) return; // needs a non-contiguous subset (cores 0 and 2)
         var vm = NewEditor();
         // Cores 0 and 2 only (0b101).
         var rule = new ProcessRule { Match = "MyGame", AffinityMask = 0b101 };
