@@ -77,9 +77,11 @@ active rules). Right-click any process for a full Process-Lasso-style menu:
 - **Trim memory**, **Copy rule**, **Remove rule**, and **Restart / Restart as admin / Close / Terminate**
 
 Every option shows a **checkmark on what's currently applied** and moves as you change it. The
-right-hand **Rule** panel mirrors that same state — it opens **pre-filled with the process's current
-settings** so you can see what exists and what you're changing it to — then **Save** it as a
-persistent rule or **Apply now** one-off. Live activity log; import/export rules as JSON.
+right-hand **Rule** panel is a **live mirror** of that same state — it opens **pre-filled with the
+process's current settings**, and changing a setting in either place updates the other. Hit **Apply**
+to keep those settings enforced: they're saved as a rule and re-applied automatically, including when
+the game relaunches. (Remove a rule via right-click → **Remove saved rule**.) Live activity log;
+import/export rules as JSON.
 
 **Booster Rules** — every saved rule in one place, showing exactly what it applies (priority, cores,
 I/O, memory, eco, boost, CPU sets, GPU) and whether its process is running. Apply, enable/disable or

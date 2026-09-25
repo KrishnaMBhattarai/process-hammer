@@ -95,6 +95,60 @@ public class RuleEditorCpuSetTests
     }
 
     [Fact]
+    public void FullCurrentState_ReflectsInEveryFieldAndRoundTrips()
+    {
+        var vm = Editor();
+        var current = new CurrentState(
+            Cpu: CpuPriority.High, Affinity: 0b101, Io: IoPriority.Low, Memory: MemoryPriority.Medium,
+            Eco: true, BoostEnabled: false,
+            CpuSets: CpuSetSelection.PerformanceCores, GpuScheduling: GpuSchedulingPriority.High,
+            GpuPreference: GpuPreference.HighPerformance);
+
+        vm.LoadFrom(rule: null, current);
+
+        // Every field mirrors the current state (this is what the menu and panel share).
+        Assert.Equal(CpuPriority.High, vm.SelectedCpuPriority!.Value);
+        Assert.Equal(IoPriority.Low, vm.SelectedIo!.Value);
+        Assert.Equal(MemoryPriority.Medium, vm.SelectedMemory!.Value);
+        Assert.Equal(true, vm.SelectedEfficiency!.Value);
+        Assert.Equal(true, vm.SelectedBoost!.Value); // boost enabled=false → disable-boost=true
+        Assert.Equal(CpuSetSelection.PerformanceCores, vm.SelectedCpuSet!.Value);
+        Assert.Equal(GpuSchedulingPriority.High, vm.SelectedGpuScheduling!.Value);
+        Assert.Equal(GpuPreference.HighPerformance, vm.SelectedGpuPreference!.Value);
+        Assert.Equal("0,2", vm.AffinityText);
+
+        // ...and BuildRule reproduces all of it (so Apply persists exactly what's shown).
+        var r = vm.BuildRule()!;
+        Assert.Equal(CpuPriority.High, r.CpuPriority);
+        Assert.Equal(0b101UL, r.AffinityMask);
+        Assert.Equal(IoPriority.Low, r.IoPriority);
+        Assert.Equal(MemoryPriority.Medium, r.MemoryPriority);
+        Assert.Equal(true, r.EfficiencyMode);
+        Assert.Equal(true, r.DisablePriorityBoost);
+        Assert.Equal(CpuSetSelection.PerformanceCores, r.CpuSetSelection);
+        Assert.Equal(GpuSchedulingPriority.High, r.GpuSchedulingPriority);
+        Assert.Equal(GpuPreference.HighPerformance, r.GpuPreference);
+    }
+
+    [Fact]
+    public void RuleOverridesCurrent_PerField()
+    {
+        var vm = Editor();
+        var rule = new ProcessRule { Match = "MyGame", CpuPriority = CpuPriority.Idle, GpuPreference = GpuPreference.PowerSaving };
+        var current = new CurrentState(
+            Cpu: CpuPriority.High, Affinity: null, Io: IoPriority.Normal, Memory: null, Eco: null, BoostEnabled: null,
+            CpuSets: CpuSetSelection.All, GpuScheduling: GpuSchedulingPriority.Normal, GpuPreference: GpuPreference.HighPerformance);
+
+        vm.LoadFrom(rule, current);
+
+        Assert.Equal(CpuPriority.Idle, vm.SelectedCpuPriority!.Value);              // rule wins
+        Assert.Equal(GpuPreference.PowerSaving, vm.SelectedGpuPreference!.Value);   // rule wins
+        Assert.Equal(IoPriority.Normal, vm.SelectedIo!.Value);                      // current fills the gap
+        Assert.Equal(GpuSchedulingPriority.Normal, vm.SelectedGpuScheduling!.Value);// current fills the gap
+        Assert.Equal(CpuSetSelection.All, vm.SelectedCpuSet!.Value);                // current fills the gap
+    }
+
+    [Fact]
     public void IsCustomCpuSet_ReflectsSelection()
     {
         var vm = Editor();
