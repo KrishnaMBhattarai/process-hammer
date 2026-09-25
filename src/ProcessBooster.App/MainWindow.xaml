@@ -71,10 +71,12 @@
             </Setter>
         </Style>
 
-        <!-- Checkable option in a right-click submenu; tick reflects the value applied now. -->
+        <!-- Checkable option in a right-click submenu; tick reflects the value applied now.
+             StaysOpenOnClick keeps the menu up so several settings can be changed in one go. -->
         <Style x:Key="OptionMenuItem" TargetType="MenuItem">
             <Setter Property="Header" Value="{Binding Label}" />
             <Setter Property="IsCheckable" Value="True" />
+            <Setter Property="StaysOpenOnClick" Value="True" />
             <Setter Property="IsChecked" Value="{Binding IsChecked, Mode=OneWay}" />
             <Setter Property="Command" Value="{Binding Command}" />
         </Style>
@@ -362,11 +364,11 @@
                                         <MenuItem Header="CPU priority" ItemsSource="{Binding CpuPriorityMenu}" ItemContainerStyle="{StaticResource OptionMenuItem}" />
                                         <MenuItem Header="CPU affinity — hard limit"
                                                   ToolTip="Strict: the process can ONLY run on the ticked cores. Best for firmly pinning a game to Performance cores.">
-                                            <MenuItem Header="All cores (P + E)" IsCheckable="True" IsChecked="{Binding AffinityIsAllCores, Mode=OneWay}"
+                                            <MenuItem Header="All cores (P + E)" IsCheckable="True" StaysOpenOnClick="True" IsChecked="{Binding AffinityIsAllCores, Mode=OneWay}"
                                                       Command="{Binding AffinityPresetCommand}" CommandParameter="all" />
-                                            <MenuItem Header="Performance cores (P)" IsCheckable="True" IsChecked="{Binding AffinityIsPerformance, Mode=OneWay}"
+                                            <MenuItem Header="Performance cores (P)" IsCheckable="True" StaysOpenOnClick="True" IsChecked="{Binding AffinityIsPerformance, Mode=OneWay}"
                                                       Command="{Binding AffinityPresetCommand}" CommandParameter="p" />
-                                            <MenuItem Header="Efficiency cores (E)" IsCheckable="True" IsChecked="{Binding AffinityIsEfficiency, Mode=OneWay}"
+                                            <MenuItem Header="Efficiency cores (E)" IsCheckable="True" StaysOpenOnClick="True" IsChecked="{Binding AffinityIsEfficiency, Mode=OneWay}"
                                                       Command="{Binding AffinityPresetCommand}" CommandParameter="e" />
                                             <Separator />
                                             <MenuItem Header="Choose cores…" ItemsSource="{Binding AffinityCores}" ItemContainerStyle="{StaticResource CoreMenuItem}" />
