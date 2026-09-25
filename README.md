@@ -162,6 +162,16 @@ running the app, not by unit tests.
 Code signing (to drop the SmartScreen warning) · per-process GPU % · left-sidebar navigation ·
 localization.
 
+## 💖 Support development
+
+Process Hammer is free and always will be — no paywall, no telemetry. If it's useful to you and
+you'd like to help fund development, you can leave a tip:
+
+[![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-support%20development-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/hammerpower)
+
+Tips are entirely optional gifts, not a purchase — they don't unlock features or change the
+**"as is", no-warranty** terms below. Thank you for the support! 🙏
+
 ## 🤝 Contributing
 
 PRs welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)**. Best first help: **test on your hardware**
