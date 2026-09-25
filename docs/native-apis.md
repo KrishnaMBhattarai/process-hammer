@@ -1,7 +1,7 @@
-# Native APIs used by Process Booster
+# Native APIs used by Process Hammer
 
 Every setting maps to a documented (or well-established) Windows API. Signatures live in
-`ProcessBooster.Core/Interop/NativeMethods.cs`; this table is the reference and rationale.
+`ProcessHammer.Core/Interop/NativeMethods.cs`; this table is the reference and rationale.
 
 | Feature | API / mechanism | Values | Notes |
 |---|---|---|---|
@@ -12,8 +12,16 @@ Every setting maps to a documented (or well-established) Windows API. Signatures
 | Memory priority | `SetProcessInformation(ProcessMemoryPriority)` + `MEMORY_PRIORITY_INFORMATION` (kernel32) | 1 VeryLow … 5 Normal | Influences working-set trim order. |
 | Efficiency mode | `SetProcessInformation(ProcessPowerThrottling)` + `PROCESS_POWER_THROTTLING_STATE` (kernel32) | EXECUTION_SPEED on/off | On = EcoQoS. Off = reset to system-managed (reads back as "not set"). |
 | CPU sets | `GetSystemCpuSetInformation` → IDs → `SetProcessDefaultCpuSets` (kernel32) | set IDs | `EfficiencyClass` distinguishes P-cores (higher) from E-cores (lower). `null` clears. |
-| GPU preference | Registry `HKCU\Software\Microsoft\DirectX\UserGpuPreferences`, value = exe path, data `GpuPreference=N;` | 0 default, 1 power-saving, 2 high-performance | Persistent; applies on next launch. Other tokens (e.g. `AutoHDREnable`) are preserved. |
-| GPU scheduling priority | `D3DKMTSetProcessSchedulingPriorityClass` (gdi32) | Idle…Realtime (0–5) | Best-effort; may require elevation. |
+| GPU preference | Registry `HKCU\Software\Microsoft\DirectX\UserGpuPreferences`, value = exe path, data `GpuPreference=N;` | 0 default, 1 power-saving, 2 high-performance | Persistent; applies on next launch. Not a process handle, so it works even on protected apps. Other tokens (e.g. `AutoHDREnable`) are preserved. |
+| GPU scheduling priority | `D3DKMTSetProcessSchedulingPriorityClass` / `...Get...` (gdi32) | Idle…Realtime (0–5) | Best-effort; may require elevation. |
+| Trim memory | `K32EmptyWorkingSet` (kernel32/psapi) | — | Empties the working set; pages fault back in on demand. Needs `PROCESS_QUERY_INFORMATION | PROCESS_SET_QUOTA`. |
+| Power plan | `PowerEnumerate` / `PowerGetActiveScheme` / `PowerSetActiveScheme` (powrprof) | scheme GUIDs | System-wide, not per-process. Friendly names via `PowerReadFriendlyName`. |
+| Exe path | `QueryFullProcessImageName` (kernel32) | full image path | Uses only `PROCESS_QUERY_LIMITED_INFORMATION`, so it succeeds even for protected processes (unlike `Process.MainModule`). |
+
+Most per-process **writes** require opening the target with `PROCESS_SET_INFORMATION`. Anti-cheat and
+core system processes deny that even to administrators, so those settings return `Failed (access
+denied)` — a Windows protection, not a bug. Limited-info **reads** (name, path, current values) still
+work on them.
 
 ## References
 

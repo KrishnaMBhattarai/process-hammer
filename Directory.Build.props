@@ -1,9 +1,9 @@
 <Project>
   <!-- Shared properties for every project in the solution. Bump <Version> here to release. -->
   <PropertyGroup>
-    <Version>0.20.0</Version>
-    <Product>Process Booster</Product>
-    <Authors>Process Booster contributors</Authors>
+    <Version>0.21.0</Version>
+    <Product>Process Hammer</Product>
+    <Authors>Process Hammer contributors</Authors>
     <TargetFramework>net8.0-windows</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>

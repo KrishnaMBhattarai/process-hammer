@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>ProcessHammer.Core</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Interop marshalling analyzer noise; the interop is hand-verified. -->
+    <NoWarn>$(NoWarn);CA1401;SYSLIB1054</NoWarn>
+  </PropertyGroup>
+
+</Project>

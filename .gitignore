@@ -10,7 +10,7 @@ publish/
 
 # Logs / local config produced at runtime
 *.log
-processbooster.config.local.json
+processhammer.config.local.json
 
 # OS
 .DS_Store
