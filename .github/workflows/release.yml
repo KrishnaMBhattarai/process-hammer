@@ -1,0 +1,31 @@
+name: Release
+
+# Every push to main builds, tests, and publishes/refreshes the GitHub Release for the version in
+# Directory.Build.props — so the Releases page (with the SHA-256) always matches main. Bump the
+# <Version> to cut a new release; pushing the same version just refreshes its assets.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Test
+        run: dotnet test -c Release --nologo
+
+      - name: Build distributables and publish the release
+        run: ./publish.ps1 -Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
