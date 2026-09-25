@@ -43,11 +43,11 @@ Every release ships a matching `.sha256` file. Check your download hasn't been t
 
 ```powershell
 # PowerShell — should match the hash in the .sha256 file on the release
-Get-FileHash .\ProcessBooster_SelfContained_v0.10.0.exe -Algorithm SHA256
+Get-FileHash .\ProcessBooster_SelfContained_v0.14.0.exe -Algorithm SHA256
 ```
 ```cmd
 :: or with certutil
-certutil -hashfile ProcessBooster_SelfContained_v0.10.0.exe SHA256
+certutil -hashfile ProcessBooster_SelfContained_v0.14.0.exe SHA256
 ```
 
 Compare the output to the hash inside `ProcessBooster_SelfContained_vX.Y.Z.exe.sha256`. If they
@@ -64,11 +64,26 @@ everything else still works. Prefer to be safe? **Build it yourself** (below).
 
 ## 🧰 What's inside
 
-**Processes** — a live, sortable table (CPU %, priority, affinity, I/O, memory, RAM, active rule).
-Pick any process and set **CPU priority · affinity · I/O priority · memory priority · efficiency
-mode (EcoQoS) · priority boost · CPU sets (P/E cores) · GPU preference · GPU scheduling**. Save it
-as a **persistent rule**, **Apply now** one-off, or right-click for quick actions. Live activity log;
-import/export rules as JSON.
+**Processes** — a live, sortable table (CPU %, priority, affinity, I/O, memory, threads, RAM,
+active rules). Right-click any process for a full Process-Lasso-style menu:
+
+- **CPU priority** (Idle → Realtime)
+- **CPU affinity** — a checkbox per logical core, plus **All / P-core / E-core** presets (a *hard*
+  limit: the process runs only on the ticked cores)
+- **CPU sets** — the *soft* version of affinity (prefer these cores, but Windows may still use others)
+- **I/O priority**, **Memory priority**, **GPU priority**, **GPU preference**, **Efficiency mode
+  (EcoQoS)**, **Priority boost**
+- **Power profile** (switch the active Windows power plan)
+- **Trim memory**, **Copy rule**, **Remove rule**, and **Restart / Restart as admin / Close / Terminate**
+
+Every option shows a **checkmark on what's currently applied** and moves as you change it. The
+right-hand **Rule** panel mirrors that same state — it opens **pre-filled with the process's current
+settings** so you can see what exists and what you're changing it to — then **Save** it as a
+persistent rule or **Apply now** one-off. Live activity log; import/export rules as JSON.
+
+**Booster Rules** — every saved rule in one place, showing exactly what it applies (priority, cores,
+I/O, memory, eco, boost, CPU sets, GPU) and whether its process is running. Apply, enable/disable or
+remove rules here, next to a built-in **reference guide** that explains what each setting does.
 
 **Info tabs:**
 
@@ -96,9 +111,24 @@ Requires the **.NET 8 SDK**.
 
 ```powershell
 dotnet build -c Release
-dotnet test  -c Release     # 46 tests, incl. real self-process interop checks
+dotnet test  -c Release     # 155 tests (see "Testing" below)
 ./publish.ps1               # builds both distributables + the versioned exe & SHA-256
 ```
+
+### ✅ Testing
+
+**155 tests**, run on Windows. They cover:
+
+- **Pure logic** — affinity-mask parsing (whitespace, ranges, out-of-range), P/E-core presets, rule
+  matching & normalization, config serialization/round-trips, and the view-model state that drives
+  the menus and the Rule editor. Core logic sits at **~89% line coverage**.
+- **Functional read-back** — every boosting action (CPU priority, affinity, CPU sets, I/O, memory,
+  GPU priority, GPU preference, efficiency, priority boost, trim, power plan, terminate) is applied
+  to a real process and then **read back** to prove it actually took effect — not just that a call
+  returned. State is always restored afterwards.
+
+The remainder of the code is UI (XAML), live process enumeration, and WMI/sensor hardware readers,
+which are exercised by using the app rather than by unit tests.
 
 ## 🗺️ Roadmap
 
